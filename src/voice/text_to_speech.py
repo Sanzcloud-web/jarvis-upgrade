@@ -6,13 +6,15 @@ from gtts import gTTS
 from typing import Optional
 
 class TextToSpeech:
-    def __init__(self):
+    def __init__(self, speed_factor: float = 1.3):
         try:
-            # Initialiser pygame pour la lecture audio
-            pygame.mixer.init()
-            print("🔊 JARVIS TTS Google activé")
+            # Initialiser pygame avec fréquence optimisée pour vitesse
+            pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
+            self.speed_factor = speed_factor  # Facteur d'accélération (1.0 = normal, 1.5 = 50% plus rapide)
+            print(f"🔊 JARVIS TTS Google activé (vitesse x{speed_factor})")
         except Exception as e:
             print(f"⚠️ Erreur initialisation TTS: {e}")
+            self.speed_factor = 1.0
 
     def speak(self, text: str):
         """Fait parler JARVIS avec Google TTS"""

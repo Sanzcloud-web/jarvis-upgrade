@@ -12,6 +12,11 @@ class VoiceManager:
         self.recognizer = sr.Recognizer()
         self.microphone = sr.Microphone()
 
+        # Configuration optimisée pour gérer les pauses et hésitations
+        self.recognizer.pause_threshold = 1.2  # Plus de tolérance pour les pauses (défaut: 0.8)
+        self.recognizer.non_speaking_duration = 1.0  # Durée avant considérer comme silence
+        self.recognizer.phrase_threshold = 0.3  # Sensibilité de détection de début de phrase
+
         # Initialisation de la synthèse vocale Google TTS
         self.tts = TextToSpeech()
 
@@ -40,14 +45,14 @@ class VoiceManager:
         except Exception as e:
             print(f"❌ Erreur synthèse vocale: {e}")
 
-    def listen_once(self, timeout: int = 5) -> Optional[str]:
+    def listen_once(self, timeout: int = 10) -> Optional[str]:
         """Écoute une fois et retourne le texte reconnu"""
         try:
-            print("🎤 Écoute en cours... (parlez maintenant)")
+            print("🎤 Écoute en cours... (prenez votre temps, pauses autorisées)")
 
             with self.microphone as source:
-                # Écouter avec timeout
-                audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=10)
+                # Écouter avec timeout augmenté et phrase_time_limit plus long
+                audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=15)
 
             print("🔄 Reconnaissance en cours...")
 
@@ -57,10 +62,10 @@ class VoiceManager:
             return text
 
         except sr.WaitTimeoutError:
-            print("⏰ Timeout - aucune parole détectée")
+            print("⏰ Timeout - aucune parole détectée (essayez de parler plus fort)")
             return None
         except sr.UnknownValueError:
-            print("❌ Impossible de comprendre l'audio")
+            print("❌ Impossible de comprendre l'audio (répétez svp)")
             return None
         except sr.RequestError as e:
             print(f"❌ Erreur service reconnaissance: {e}")
@@ -77,8 +82,8 @@ class VoiceManager:
             while self.is_listening:
                 try:
                     with self.microphone as source:
-                        # Écoute avec timeout court pour permettre l'arrêt
-                        audio = self.recognizer.listen(source, timeout=1, phrase_time_limit=10)
+                        # Écoute avec paramètres optimisés pour gérer les pauses
+                        audio = self.recognizer.listen(source, timeout=2, phrase_time_limit=15)
 
                     # Reconnaissance en arrière-plan
                     try:
