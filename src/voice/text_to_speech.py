@@ -1,101 +1,117 @@
 # -*- coding: utf-8 -*-
-import os
-import tempfile
-import pygame
-from gtts import gTTS
+import pyttsx3
+import threading
 from typing import Optional
 
 class TextToSpeech:
     def __init__(self, speed_factor: float = 1.3):
         try:
-            # Initialiser pygame avec fréquence optimisée pour vitesse
-            pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
-            self.speed_factor = speed_factor  # Facteur d'accélération (1.0 = normal, 1.5 = 50% plus rapide)
+            # Initialiser pyttsx3 pour TTS en temps réel
+            self.engine = pyttsx3.init()
+            
+            # Configuration de la voix
+            voices = self.engine.getProperty('voices')
+            if voices:
+                # Essayer de trouver une voix française
+                for voice in voices:
+                    if 'french' in voice.name.lower() or 'fr' in voice.id.lower():
+                        self.engine.setProperty('voice', voice.id)
+                        break
+            
+            # Configuration de la vitesse et du volume
+            base_rate = self.engine.getProperty('rate')
+            self.engine.setProperty('rate', int(base_rate * speed_factor))
+            self.engine.setProperty('volume', 0.9)
+            
             self.is_speaking = False
             self.should_stop = False
-            print(f"🔊 JARVIS TTS Google activé (vitesse x{speed_factor})")
+            print(f"🔊 JARVIS TTS basique activé (vitesse x{speed_factor})")
         except Exception as e:
             print(f"⚠️ Erreur initialisation TTS: {e}")
-            self.speed_factor = 1.0
+            self.engine = None
             self.is_speaking = False
             self.should_stop = False
 
     def speak(self, text: str):
-        """Fait parler JARVIS avec Google TTS accéléré et interruption possible"""
+        """Fait parler JARVIS avec pyttsx3 et interruption possible en temps réel"""
+        if not self.engine:
+            print("❌ Moteur TTS non disponible")
+            return
+            
         try:
             self.is_speaking = True
             self.should_stop = False
 
-            # Créer l'audio avec Google TTS (français, rapide)
-            tts = gTTS(text=text, lang='fr', slow=False)
-
-            # Sauvegarder dans un fichier temporaire
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp_file:
-                tmp_file_path = tmp_file.name
-
-            # Sauvegarder l'audio TTS
-            tts.save(tmp_file_path)
-
-            # Charger et jouer l'audio plus rapidement
-            sound = pygame.mixer.Sound(tmp_file_path)
-
-            # Jouer le son avec contrôle d'interruption
-            channel = sound.play()
-
-            # Vérifier l'interruption très fréquemment
-            while channel.get_busy() and not self.should_stop:
-                pygame.time.wait(10)  # Vérification ultra-fréquente (10ms) pour interruption immédiate
-
-            # Si interruption demandée, arrêter l'audio
-            if self.should_stop:
-                channel.stop()
-                print("🔇 JARVIS interrompu")
+            # Diviser le texte en phrases pour permettre l'interruption
+            sentences = self._split_text(text)
+            
+            for sentence in sentences:
+                if self.should_stop:
+                    break
+                    
+                # Parler phrase par phrase
+                self.engine.say(sentence)
+                
+                # Démarrer la synthèse dans un thread pour pouvoir l'interrompre
+                speak_thread = threading.Thread(target=self._speak_sentence, daemon=True)
+                speak_thread.start()
+                
+                # Attendre que la phrase soit finie ou qu'on soit interrompu
+                speak_thread.join(timeout=10)  # Timeout de sécurité
+                
+                if self.should_stop:
+                    self.engine.stop()
+                    print("🔇 JARVIS interrompu")
+                    break
 
             self.is_speaking = False
-
-            # Nettoyer le fichier temporaire
-            try:
-                os.unlink(tmp_file_path)
-            except:
-                pass
 
         except Exception as e:
             print(f"❌ Erreur synthèse vocale: {e}")
             self.is_speaking = False
+    
+    def _speak_sentence(self):
+        """Parle une phrase avec le moteur TTS"""
+        try:
+            self.engine.runAndWait()
+        except:
+            pass
+    
+    def _split_text(self, text: str) -> list:
+        """Divise le texte en phrases pour permettre l'interruption"""
+        import re
+        # Diviser par phrases (points, points d'exclamation, points d'interrogation)
+        sentences = re.split(r'[.!?]+', text)
+        # Nettoyer et filtrer les phrases vides
+        sentences = [s.strip() for s in sentences if s.strip()]
+        return sentences
 
     def speak_async(self, text: str):
-        """Parle de manière asynchrone (non-bloquant) et rapide"""
-        try:
-            # Créer l'audio avec Google TTS (français, rapide)
-            tts = gTTS(text=text, lang='fr', slow=False)
-
-            # Sauvegarder dans un fichier temporaire
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp_file:
-                tmp_file_path = tmp_file.name
-
-            # Sauvegarder l'audio TTS
-            tts.save(tmp_file_path)
-
-            # Jouer l'audio sans attendre avec optimisations
-            sound = pygame.mixer.Sound(tmp_file_path)
-            sound.play()
-
-        except Exception as e:
-            print(f"❌ Erreur synthèse vocale async: {e}")
+        """Parle de manière asynchrone (non-bloquant)"""
+        speak_thread = threading.Thread(target=self.speak, args=(text,), daemon=True)
+        speak_thread.start()
 
     def stop_speaking(self):
         """Arrête JARVIS de parler immédiatement"""
         self.should_stop = True
-        # Arrêter tous les canaux pygame immédiatement
-        try:
-            pygame.mixer.stop()  # Arrête tous les sons en cours
-        except:
-            pass
+        if self.engine:
+            try:
+                self.engine.stop()  # Arrête le moteur TTS immédiatement
+            except:
+                pass
 
     def set_rate(self, rate: int):
-        """Modifie la vitesse de parole (non applicable pour Google TTS)"""
-        pass
+        """Modifie la vitesse de parole"""
+        if self.engine:
+            try:
+                self.engine.setProperty('rate', rate)
+            except:
+                pass
 
     def set_volume(self, volume: float):
-        """Modifie le volume (non applicable pour Google TTS)"""
-        pass
+        """Modifie le volume (0.0 à 1.0)"""
+        if self.engine:
+            try:
+                self.engine.setProperty('volume', min(1.0, max(0.0, volume)))
+            except:
+                pass

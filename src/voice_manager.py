@@ -3,8 +3,6 @@ import speech_recognition as sr
 import threading
 import queue
 import time
-import pyaudio
-import numpy as np
 from typing import Optional, Callable
 from .voice.text_to_speech import TextToSpeech
 
@@ -130,61 +128,38 @@ class VoiceManager:
         self.is_listening = False
 
     def start_interrupt_monitor(self):
-        """Démarre la surveillance d'interruption simplifiée avec détection de touche"""
+        """Démarre la surveillance d'interruption avec détection audio simple"""
         if self.interrupt_monitor_active:
             return
 
         self.interrupt_monitor_active = True
-        print("🎤 Surveillance d'interruption activée")
-        print("💡 Appuyez sur [ESPACE] pendant que JARVIS parle pour l'interrompre")
+        print("🎤 Surveillance d'interruption activée - parlez pour interrompre JARVIS")
 
-        def simple_monitor_worker():
-            import keyboard
-            
+        def audio_interrupt_worker():
             while self.interrupt_monitor_active and self.tts.is_speaking:
                 try:
-                    # Vérifier si la touche espace est pressée
-                    if keyboard.is_pressed('space'):
-                        print("⏹️ Interruption par touche ESPACE détectée !")
-                        self.tts.stop_speaking()
-                        self.interrupt_monitor_active = False
-                        break
+                    with self.microphone as source:
+                        # Écoute très courte pour détecter une intervention
+                        audio = self.recognizer.listen(source, timeout=0.3, phrase_time_limit=0.5)
                         
-                    # Vérifier très rapidement
-                    time.sleep(0.05)  # 50ms
-                    
-                except Exception:
-                    # Si keyboard ne fonctionne pas, utiliser la méthode audio fallback
-                    self._fallback_interrupt_monitor()
+                    # Si on arrive ici, c'est qu'il y a eu du son
+                    print("🎤 Interruption détectée !")
+                    self.tts.stop_speaking()
+                    self.interrupt_monitor_active = False
                     break
+                        
+                except sr.WaitTimeoutError:
+                    # Pas de son détecté, continuer
+                    continue
+                except Exception:
+                    # Ignorer les autres erreurs
+                    time.sleep(0.1)
+                    continue
 
         # Démarrer la surveillance en arrière-plan
-        monitor_thread = threading.Thread(target=simple_monitor_worker, daemon=True)
+        monitor_thread = threading.Thread(target=audio_interrupt_worker, daemon=True)
         monitor_thread.start()
     
-    def _fallback_interrupt_monitor(self):
-        """Méthode de surveillance d'interruption de secours avec détection audio simple"""
-        print("🔄 Utilisation du système de secours - parlez fort pour interrompre")
-        
-        while self.interrupt_monitor_active and self.tts.is_speaking:
-            try:
-                with self.microphone as source:
-                    # Écoute très courte pour détecter une intervention
-                    audio = self.recognizer.listen(source, timeout=0.2, phrase_time_limit=0.5)
-                    
-                # Si on arrive ici, c'est qu'il y a eu du son
-                print("🎤 Interruption détectée (audio) !")
-                self.tts.stop_speaking()
-                self.interrupt_monitor_active = False
-                break
-                    
-            except sr.WaitTimeoutError:
-                # Pas de son détecté, continuer
-                continue
-            except Exception:
-                # Ignorer les autres erreurs
-                time.sleep(0.1)
-                continue
 
     def stop_interrupt_monitor(self):
         """Arrête la surveillance d'interruption"""
