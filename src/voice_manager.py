@@ -3,6 +3,8 @@ import speech_recognition as sr
 import threading
 import queue
 import time
+import pyaudio
+import numpy as np
 from typing import Optional, Callable
 from .voice.text_to_speech import TextToSpeech
 
@@ -128,44 +130,61 @@ class VoiceManager:
         self.is_listening = False
 
     def start_interrupt_monitor(self):
-        """Démarre la surveillance d'interruption en arrière-plan"""
+        """Démarre la surveillance d'interruption simplifiée avec détection de touche"""
         if self.interrupt_monitor_active:
             return
 
         self.interrupt_monitor_active = True
+        print("🎤 Surveillance d'interruption activée")
+        print("💡 Appuyez sur [ESPACE] pendant que JARVIS parle pour l'interrompre")
 
-        def monitor_worker():
+        def simple_monitor_worker():
+            import keyboard
+            
             while self.interrupt_monitor_active and self.tts.is_speaking:
                 try:
-                    with self.microphone as source:
-                        # Écoute courte mais suffisante pour détecter une intervention
-                        audio = self.recognizer.listen(source, timeout=1.0, phrase_time_limit=3)
-
-                    # Si on détecte du son, interrompre JARVIS
-                    try:
-                        # Tentative de reconnaissance (même si elle échoue, ça signifie qu'on parle)
-                        self.recognizer.recognize_google(audio, language='fr-FR')
-                        # Si la reconnaissance réussit, c'est qu'on a parlé
-                        print("🎤 Interruption détectée !")
+                    # Vérifier si la touche espace est pressée
+                    if keyboard.is_pressed('space'):
+                        print("⏹️ Interruption par touche ESPACE détectée !")
                         self.tts.stop_speaking()
+                        self.interrupt_monitor_active = False
                         break
-                    except sr.UnknownValueError:
-                        # Même si on ne comprend pas, le fait qu'il y ait du son peut être une interruption
-                        # On vérifie le niveau audio
-                        pass
-                    except sr.RequestError:
-                        pass
-
-                except sr.WaitTimeoutError:
-                    # Pas de son détecté, continuer la surveillance
-                    continue
+                        
+                    # Vérifier très rapidement
+                    time.sleep(0.05)  # 50ms
+                    
                 except Exception:
-                    # Ignorer les autres erreurs et continuer
-                    continue
+                    # Si keyboard ne fonctionne pas, utiliser la méthode audio fallback
+                    self._fallback_interrupt_monitor()
+                    break
 
         # Démarrer la surveillance en arrière-plan
-        monitor_thread = threading.Thread(target=monitor_worker, daemon=True)
+        monitor_thread = threading.Thread(target=simple_monitor_worker, daemon=True)
         monitor_thread.start()
+    
+    def _fallback_interrupt_monitor(self):
+        """Méthode de surveillance d'interruption de secours avec détection audio simple"""
+        print("🔄 Utilisation du système de secours - parlez fort pour interrompre")
+        
+        while self.interrupt_monitor_active and self.tts.is_speaking:
+            try:
+                with self.microphone as source:
+                    # Écoute très courte pour détecter une intervention
+                    audio = self.recognizer.listen(source, timeout=0.2, phrase_time_limit=0.5)
+                    
+                # Si on arrive ici, c'est qu'il y a eu du son
+                print("🎤 Interruption détectée (audio) !")
+                self.tts.stop_speaking()
+                self.interrupt_monitor_active = False
+                break
+                    
+            except sr.WaitTimeoutError:
+                # Pas de son détecté, continuer
+                continue
+            except Exception:
+                # Ignorer les autres erreurs
+                time.sleep(0.1)
+                continue
 
     def stop_interrupt_monitor(self):
         """Arrête la surveillance d'interruption"""

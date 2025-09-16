@@ -42,9 +42,9 @@ class TextToSpeech:
             # Jouer le son avec contrôle d'interruption
             channel = sound.play()
 
-            # Vérifier l'interruption plus fréquemment
+            # Vérifier l'interruption très fréquemment
             while channel.get_busy() and not self.should_stop:
-                pygame.time.wait(50)  # Vérification plus fréquente pour interruption
+                pygame.time.wait(10)  # Vérification ultra-fréquente (10ms) pour interruption immédiate
 
             # Si interruption demandée, arrêter l'audio
             if self.should_stop:
@@ -84,8 +84,13 @@ class TextToSpeech:
             print(f"❌ Erreur synthèse vocale async: {e}")
 
     def stop_speaking(self):
-        """Arrête JARVIS de parler"""
+        """Arrête JARVIS de parler immédiatement"""
         self.should_stop = True
+        # Arrêter tous les canaux pygame immédiatement
+        try:
+            pygame.mixer.stop()  # Arrête tous les sons en cours
+        except:
+            pass
 
     def set_rate(self, rate: int):
         """Modifie la vitesse de parole (non applicable pour Google TTS)"""
