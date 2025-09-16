@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 import speech_recognition as sr
-import pyttsx3
 import threading
 import queue
 import time
 from typing import Optional, Callable
+from .voice.text_to_speech import TextToSpeech
 
 class VoiceManager:
     def __init__(self):
@@ -12,9 +12,8 @@ class VoiceManager:
         self.recognizer = sr.Recognizer()
         self.microphone = sr.Microphone()
 
-        # Initialisation de la synthèse vocale
-        self.tts_engine = pyttsx3.init()
-        self.setup_tts()
+        # Initialisation de la synthèse vocale Google TTS
+        self.tts = TextToSpeech()
 
         # Calibrage du micro
         self.calibrate_microphone()
@@ -23,28 +22,6 @@ class VoiceManager:
         self.is_listening = False
         self.voice_queue = queue.Queue()
 
-    def setup_tts(self):
-        """Configure la synthèse vocale"""
-        try:
-            # Réglages de la voix
-            voices = self.tts_engine.getProperty('voices')
-
-            # Chercher une voix française si disponible
-            french_voice = None
-            for voice in voices:
-                if 'french' in voice.name.lower() or 'fr' in voice.id.lower():
-                    french_voice = voice
-                    break
-
-            if french_voice:
-                self.tts_engine.setProperty('voice', french_voice.id)
-
-            # Réglages de vitesse et volume
-            self.tts_engine.setProperty('rate', 180)  # Vitesse de parole
-            self.tts_engine.setProperty('volume', 0.9)  # Volume
-
-        except Exception as e:
-            print(f"⚠️ Erreur configuration TTS: {e}")
 
     def calibrate_microphone(self):
         """Calibre le microphone pour réduire le bruit ambiant"""
@@ -57,11 +34,9 @@ class VoiceManager:
             print(f"⚠️ Erreur calibrage micro: {e}")
 
     def speak(self, text: str):
-        """Fait parler JARVIS"""
+        """Fait parler JARVIS avec Google TTS"""
         try:
-            print(f"🔊 JARVIS dit: {text}")
-            self.tts_engine.say(text)
-            self.tts_engine.runAndWait()
+            self.tts.speak(text)
         except Exception as e:
             print(f"❌ Erreur synthèse vocale: {e}")
 
