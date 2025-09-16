@@ -19,8 +19,6 @@ class TextToSpeech:
     def speak(self, text: str):
         """Fait parler JARVIS avec Google TTS accéléré"""
         try:
-            print(f"🔊 JARVIS dit: {text}")
-
             # Créer l'audio avec Google TTS (français, rapide)
             tts = gTTS(text=text, lang='fr', slow=False)
 
