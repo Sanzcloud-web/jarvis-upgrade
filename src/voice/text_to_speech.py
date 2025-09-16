@@ -11,14 +11,21 @@ class TextToSpeech:
             # Initialiser pygame avec fréquence optimisée pour vitesse
             pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
             self.speed_factor = speed_factor  # Facteur d'accélération (1.0 = normal, 1.5 = 50% plus rapide)
+            self.is_speaking = False
+            self.should_stop = False
             print(f"🔊 JARVIS TTS Google activé (vitesse x{speed_factor})")
         except Exception as e:
             print(f"⚠️ Erreur initialisation TTS: {e}")
             self.speed_factor = 1.0
+            self.is_speaking = False
+            self.should_stop = False
 
     def speak(self, text: str):
-        """Fait parler JARVIS avec Google TTS accéléré"""
+        """Fait parler JARVIS avec Google TTS accéléré et interruption possible"""
         try:
+            self.is_speaking = True
+            self.should_stop = False
+
             # Créer l'audio avec Google TTS (français, rapide)
             tts = gTTS(text=text, lang='fr', slow=False)
 
@@ -32,12 +39,19 @@ class TextToSpeech:
             # Charger et jouer l'audio plus rapidement
             sound = pygame.mixer.Sound(tmp_file_path)
 
-            # Jouer le son avec contrôle de vitesse via pygame
+            # Jouer le son avec contrôle d'interruption
             channel = sound.play()
 
-            # Réduire le temps d'attente entre les vérifications pour plus de réactivité
-            while channel.get_busy():
-                pygame.time.wait(50)  # Vérification plus fréquente (50ms au lieu de 100ms)
+            # Vérifier l'interruption plus fréquemment
+            while channel.get_busy() and not self.should_stop:
+                pygame.time.wait(50)  # Vérification plus fréquente pour interruption
+
+            # Si interruption demandée, arrêter l'audio
+            if self.should_stop:
+                channel.stop()
+                print("🔇 JARVIS interrompu")
+
+            self.is_speaking = False
 
             # Nettoyer le fichier temporaire
             try:
@@ -47,6 +61,7 @@ class TextToSpeech:
 
         except Exception as e:
             print(f"❌ Erreur synthèse vocale: {e}")
+            self.is_speaking = False
 
     def speak_async(self, text: str):
         """Parle de manière asynchrone (non-bloquant) et rapide"""
@@ -67,6 +82,10 @@ class TextToSpeech:
 
         except Exception as e:
             print(f"❌ Erreur synthèse vocale async: {e}")
+
+    def stop_speaking(self):
+        """Arrête JARVIS de parler"""
+        self.should_stop = True
 
     def set_rate(self, rate: int):
         """Modifie la vitesse de parole (non applicable pour Google TTS)"""

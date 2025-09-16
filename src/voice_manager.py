@@ -26,6 +26,7 @@ class VoiceManager:
         # Variables pour le contrôle
         self.is_listening = False
         self.voice_queue = queue.Queue()
+        self.interrupt_monitor_active = False
 
 
     def calibrate_microphone(self):
@@ -39,11 +40,19 @@ class VoiceManager:
             print(f"⚠️ Erreur calibrage micro: {e}")
 
     def speak(self, text: str):
-        """Fait parler JARVIS avec Google TTS"""
+        """Fait parler JARVIS avec Google TTS et détection d'interruption"""
         try:
+            # Démarrer la surveillance d'interruption
+            self.start_interrupt_monitor()
+
+            # Faire parler JARVIS
             self.tts.speak(text)
+
+            # Arrêter la surveillance
+            self.stop_interrupt_monitor()
         except Exception as e:
             print(f"❌ Erreur synthèse vocale: {e}")
+            self.stop_interrupt_monitor()
 
     def listen_once(self, timeout: int = 10) -> Optional[str]:
         """Écoute une fois et retourne le texte reconnu"""
@@ -117,6 +126,50 @@ class VoiceManager:
     def stop_listening(self):
         """Arrête l'écoute continue"""
         self.is_listening = False
+
+    def start_interrupt_monitor(self):
+        """Démarre la surveillance d'interruption en arrière-plan"""
+        if self.interrupt_monitor_active:
+            return
+
+        self.interrupt_monitor_active = True
+
+        def monitor_worker():
+            while self.interrupt_monitor_active and self.tts.is_speaking:
+                try:
+                    with self.microphone as source:
+                        # Écoute courte mais suffisante pour détecter une intervention
+                        audio = self.recognizer.listen(source, timeout=1.0, phrase_time_limit=3)
+
+                    # Si on détecte du son, interrompre JARVIS
+                    try:
+                        # Tentative de reconnaissance (même si elle échoue, ça signifie qu'on parle)
+                        self.recognizer.recognize_google(audio, language='fr-FR')
+                        # Si la reconnaissance réussit, c'est qu'on a parlé
+                        print("🎤 Interruption détectée !")
+                        self.tts.stop_speaking()
+                        break
+                    except sr.UnknownValueError:
+                        # Même si on ne comprend pas, le fait qu'il y ait du son peut être une interruption
+                        # On vérifie le niveau audio
+                        pass
+                    except sr.RequestError:
+                        pass
+
+                except sr.WaitTimeoutError:
+                    # Pas de son détecté, continuer la surveillance
+                    continue
+                except Exception:
+                    # Ignorer les autres erreurs et continuer
+                    continue
+
+        # Démarrer la surveillance en arrière-plan
+        monitor_thread = threading.Thread(target=monitor_worker, daemon=True)
+        monitor_thread.start()
+
+    def stop_interrupt_monitor(self):
+        """Arrête la surveillance d'interruption"""
+        self.interrupt_monitor_active = False
 
     def test_voice(self):
         """Test des fonctionnalités vocales"""
