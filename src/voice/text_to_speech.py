@@ -33,7 +33,7 @@ class TextToSpeech:
             self.should_stop = False
 
     def speak(self, text: str):
-        """Fait parler JARVIS avec pyttsx3 et interruption possible en temps réel"""
+        """Fait parler JARVIS avec pyttsx3 de manière simple et efficace"""
         if not self.engine:
             print("❌ Moteur TTS non disponible")
             return
@@ -42,49 +42,21 @@ class TextToSpeech:
             self.is_speaking = True
             self.should_stop = False
 
-            # Diviser le texte en phrases pour permettre l'interruption
-            sentences = self._split_text(text)
-            
-            for sentence in sentences:
-                if self.should_stop:
-                    break
-                    
-                # Parler phrase par phrase
-                self.engine.say(sentence)
-                
-                # Démarrer la synthèse dans un thread pour pouvoir l'interrompre
-                speak_thread = threading.Thread(target=self._speak_sentence, daemon=True)
-                speak_thread.start()
-                
-                # Attendre que la phrase soit finie ou qu'on soit interrompu
-                speak_thread.join(timeout=10)  # Timeout de sécurité
-                
-                if self.should_stop:
-                    self.engine.stop()
-                    print("🔇 JARVIS interrompu")
-                    break
+            # Parler directement tout le texte
+            self.engine.say(text)
+            self.engine.runAndWait()
 
             self.is_speaking = False
 
+        except KeyboardInterrupt:
+            # Gestion de l'interruption par Ctrl+C
+            self.engine.stop()
+            self.is_speaking = False
+            raise  # Relancer l'exception pour qu'elle soit gérée au niveau supérieur
         except Exception as e:
             print(f"❌ Erreur synthèse vocale: {e}")
             self.is_speaking = False
     
-    def _speak_sentence(self):
-        """Parle une phrase avec le moteur TTS"""
-        try:
-            self.engine.runAndWait()
-        except:
-            pass
-    
-    def _split_text(self, text: str) -> list:
-        """Divise le texte en phrases pour permettre l'interruption"""
-        import re
-        # Diviser par phrases (points, points d'exclamation, points d'interrogation)
-        sentences = re.split(r'[.!?]+', text)
-        # Nettoyer et filtrer les phrases vides
-        sentences = [s.strip() for s in sentences if s.strip()]
-        return sentences
 
     def speak_async(self, text: str):
         """Parle de manière asynchrone (non-bloquant)"""

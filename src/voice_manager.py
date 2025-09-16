@@ -40,19 +40,18 @@ class VoiceManager:
             print(f"⚠️ Erreur calibrage micro: {e}")
 
     def speak(self, text: str):
-        """Fait parler JARVIS avec Google TTS et détection d'interruption"""
+        """Fait parler JARVIS sans surveillance d'interruption automatique"""
         try:
-            # Démarrer la surveillance d'interruption
-            self.start_interrupt_monitor()
-
+            print("💡 Appuyez sur [CTRL+C] pour interrompre JARVIS si nécessaire")
+            
             # Faire parler JARVIS
             self.tts.speak(text)
 
-            # Arrêter la surveillance
-            self.stop_interrupt_monitor()
+        except KeyboardInterrupt:
+            print("🔇 JARVIS interrompu par l'utilisateur")
+            self.tts.stop_speaking()
         except Exception as e:
             print(f"❌ Erreur synthèse vocale: {e}")
-            self.stop_interrupt_monitor()
 
     def listen_once(self, timeout: int = 10) -> Optional[str]:
         """Écoute une fois et retourne le texte reconnu"""
@@ -128,32 +127,44 @@ class VoiceManager:
         self.is_listening = False
 
     def start_interrupt_monitor(self):
-        """Démarre la surveillance d'interruption avec détection audio simple"""
+        """Démarre la surveillance d'interruption avec détection audio améliorée"""
         if self.interrupt_monitor_active:
             return
 
         self.interrupt_monitor_active = True
-        print("🎤 Surveillance d'interruption activée - parlez pour interrompre JARVIS")
+        print("🎤 Surveillance d'interruption activée - parlez FORT pour interrompre JARVIS")
 
         def audio_interrupt_worker():
+            # Configuration plus stricte pour éviter les faux positifs
+            temp_recognizer = sr.Recognizer()
+            temp_recognizer.energy_threshold = self.recognizer.energy_threshold * 2  # Seuil plus élevé
+            temp_recognizer.pause_threshold = 0.5  # Plus de tolérance
+            
             while self.interrupt_monitor_active and self.tts.is_speaking:
                 try:
                     with self.microphone as source:
-                        # Écoute très courte pour détecter une intervention
-                        audio = self.recognizer.listen(source, timeout=0.3, phrase_time_limit=0.5)
+                        # Écoute plus longue avec seuil plus élevé pour éviter les faux positifs
+                        audio = temp_recognizer.listen(source, timeout=0.5, phrase_time_limit=1.0)
                         
-                    # Si on arrive ici, c'est qu'il y a eu du son
-                    print("🎤 Interruption détectée !")
-                    self.tts.stop_speaking()
-                    self.interrupt_monitor_active = False
-                    break
+                    # Essayer de reconnaître pour s'assurer que c'est vraiment de la parole
+                    try:
+                        text = temp_recognizer.recognize_google(audio, language='fr-FR')
+                        # Si on arrive ici, c'est vraiment de la parole
+                        if len(text.strip()) > 2:  # Au moins 3 caractères pour éviter les bruits
+                            print(f"🎤 Interruption détectée : '{text}'")
+                            self.tts.stop_speaking()
+                            self.interrupt_monitor_active = False
+                            break
+                    except (sr.UnknownValueError, sr.RequestError):
+                        # Si on ne peut pas reconnaître, c'est probablement du bruit
+                        continue
                         
                 except sr.WaitTimeoutError:
                     # Pas de son détecté, continuer
                     continue
                 except Exception:
                     # Ignorer les autres erreurs
-                    time.sleep(0.1)
+                    time.sleep(0.2)
                     continue
 
         # Démarrer la surveillance en arrière-plan
