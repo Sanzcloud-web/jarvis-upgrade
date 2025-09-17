@@ -240,6 +240,25 @@ class SystemCommands:
                         "additionalProperties": False
                     },
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_user_info",
+                    "description": "Obtient les informations personnelles de l'utilisateur (nom d'utilisateur, nom complet, nom de l'ordinateur)",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "info_type": {
+                                "type": "string",
+                                "description": "Type d'information à récupérer (all, username, fullname, computer_name, hostname)",
+                                "enum": ["all", "username", "fullname", "computer_name", "hostname"]
+                            }
+                        },
+                        "required": ["info_type"],
+                        "additionalProperties": False
+                    },
+                }
             }
         ]
 
@@ -257,7 +276,8 @@ class SystemCommands:
                 "open_application": self._open_application,
                 "open_url": self._open_url,
                 "find_files_terminal": self._find_files_terminal,
-                "smart_terminal_command": self._smart_terminal_command
+                "smart_terminal_command": self._smart_terminal_command,
+                "get_user_info": self._get_user_info
             }
             
             if tool_name in method_map:
@@ -931,3 +951,125 @@ class SystemCommands:
             return {"success": False, "error": "Commande expirée (timeout)"}
         except Exception as e:
             return {"success": False, "error": f"Erreur lors de l'exécution: {str(e)}"}
+    
+    def _get_user_info(self, info_type: str = "all") -> Dict[str, Any]:
+        """
+        Obtient les informations personnelles de l'utilisateur
+        
+        Args:
+            info_type: Type d'information ("all", "username", "fullname", "computer_name", "hostname")
+            
+        Returns:
+            Dictionnaire avec les informations demandées
+        """
+        try:
+            user_info = {}
+            
+            if info_type == "all" or info_type == "username":
+                # Nom d'utilisateur système
+                result = subprocess.run("whoami", shell=True, capture_output=True, text=True, timeout=10)
+                if result.returncode == 0:
+                    user_info["username"] = result.stdout.strip()
+            
+            if info_type == "all" or info_type == "fullname":
+                # Nom complet de l'utilisateur
+                if self.system_detector.system_type == SystemType.MACOS:
+                    # Sur macOS, essayer plusieurs méthodes pour obtenir le nom complet
+                    commands = [
+                        "id -F",  # Méthode principale
+                        f"dscl . -read /Users/{user_info.get('username', '$(whoami)')} RealName | sed -n 's/^RealName: //p'",
+                        "osascript -e 'long user name of (system info)'"  # AppleScript fallback
+                    ]
+                    
+                    for cmd in commands:
+                        try:
+                            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
+                            if result.returncode == 0 and result.stdout.strip():
+                                fullname = result.stdout.strip()
+                                # Nettoyer le résultat (parfois il y a des caractères supplémentaires)
+                                if fullname and fullname != user_info.get("username", ""):
+                                    # Si c'est dscl, nettoyer le format
+                                    if "RealName:" in fullname:
+                                        fullname = fullname.split("RealName:")[-1].strip()
+                                    user_info["fullname"] = fullname
+                                    break
+                        except:
+                            continue
+                    
+                    # Si aucun nom complet trouvé, utiliser le nom d'utilisateur
+                    if "fullname" not in user_info:
+                        user_info["fullname"] = user_info.get("username", "Utilisateur")
+                        
+                elif self.system_detector.system_type == SystemType.LINUX:
+                    # Sur Linux
+                    result = subprocess.run("getent passwd $USER | cut -d ':' -f 5 | cut -d ',' -f 1", 
+                                          shell=True, capture_output=True, text=True, timeout=10)
+                    if result.returncode == 0 and result.stdout.strip():
+                        user_info["fullname"] = result.stdout.strip()
+                    else:
+                        user_info["fullname"] = user_info.get("username", "Utilisateur")
+                        
+                elif self.system_detector.system_type == SystemType.WINDOWS:
+                    # Sur Windows
+                    result = subprocess.run("echo %USERNAME%", shell=True, capture_output=True, text=True, timeout=10)
+                    if result.returncode == 0:
+                        user_info["fullname"] = result.stdout.strip()
+            
+            if info_type == "all" or info_type == "computer_name":
+                # Nom de l'ordinateur
+                if self.system_detector.system_type == SystemType.MACOS:
+                    result = subprocess.run("scutil --get ComputerName", shell=True, capture_output=True, text=True, timeout=10)
+                    if result.returncode == 0:
+                        user_info["computer_name"] = result.stdout.strip()
+                elif self.system_detector.system_type == SystemType.LINUX:
+                    result = subprocess.run("hostname", shell=True, capture_output=True, text=True, timeout=10)
+                    if result.returncode == 0:
+                        user_info["computer_name"] = result.stdout.strip()
+                elif self.system_detector.system_type == SystemType.WINDOWS:
+                    result = subprocess.run("hostname", shell=True, capture_output=True, text=True, timeout=10)
+                    if result.returncode == 0:
+                        user_info["computer_name"] = result.stdout.strip()
+            
+            if info_type == "all" or info_type == "hostname":
+                # Nom d'hôte local
+                if self.system_detector.system_type == SystemType.MACOS:
+                    result = subprocess.run("scutil --get LocalHostName", shell=True, capture_output=True, text=True, timeout=10)
+                    if result.returncode == 0:
+                        user_info["hostname"] = result.stdout.strip()
+                else:
+                    result = subprocess.run("hostname", shell=True, capture_output=True, text=True, timeout=10)
+                    if result.returncode == 0:
+                        user_info["hostname"] = result.stdout.strip()
+            
+            # Informations système supplémentaires
+            if info_type == "all":
+                user_info["system_type"] = self.system_detector.system_type.value
+            
+            # Retourner selon le type demandé
+            if info_type == "all":
+                return {
+                    "success": True,
+                    "user_info": user_info,
+                    "greeting_name": user_info.get("fullname", user_info.get("username", "Utilisateur")),
+                    "computer_name": user_info.get("computer_name", "votre ordinateur")
+                }
+            else:
+                requested_info = user_info.get(info_type, f"Information '{info_type}' non trouvée")
+                return {
+                    "success": True,
+                    "info_type": info_type,
+                    "value": requested_info,
+                    "raw_data": user_info
+                }
+                
+        except subprocess.TimeoutExpired:
+            return {"success": False, "error": "Timeout lors de la récupération des informations utilisateur"}
+        except Exception as e:
+            return {
+                "success": False, 
+                "error": f"Erreur lors de la récupération des informations: {str(e)}",
+                "fallback": {
+                    "greeting_name": "Utilisateur",
+                    "computer_name": "votre ordinateur"
+                }
+            }

@@ -34,14 +34,17 @@ class ChatInterface:
 
     def display_welcome(self):
         """
-        Affiche le message de bienvenue
+        Affiche le message de bienvenue personnalisé
         """
+        # Récupérer les informations utilisateur pour personnaliser l'accueil
+        user_info = self._get_user_info_for_welcome()
         print("=" * 60)
         print("🎤 JARVIS - Assistant IA Vocal")
         print("=" * 60)
 
         if self.voice_mode:
-            print("🗣️ Bonjour ! Je suis JARVIS, votre assistant vocal intelligent.")
+            print(f"🗣️ {user_info['greeting']} ! Je suis JARVIS, votre assistant vocal intelligent.")
+            print(f"💻 Ravi de vous retrouver sur {user_info['computer_name']}")
             print("🎤 EN ÉCOUTE PERMANENTE - Dites 'JARVIS' pour m'activer !")
             print("💬 Dites 'JARVIS quitter' ou 'JARVIS arrêter le service' pour m'arrêter")
             print("🔄 Dites 'JARVIS mode texte' pour basculer en écriture")
@@ -50,11 +53,13 @@ class ChatInterface:
             print("🎯 Je ne réponds qu'aux phrases commençant par 'JARVIS'")
             print("🤔 NOUVEAU: Si je pose une question (?), répondez sans redire 'JARVIS' !")
 
-            # Faire parler JARVIS si le mode vocal fonctionne
+            # Faire parler JARVIS avec personnalisation si le mode vocal fonctionne
             if self.voice_manager:
-                self.voice_manager.speak("Bonjour ! Je suis JARVIS. Je suis maintenant en écoute permanente. Dites 'jarvis' puis votre demande pour m'activer. Si je vous pose une question, vous pouvez répondre directement !")
+                welcome_speech = f"{user_info['greeting']} ! Je suis JARVIS. Ravi de vous retrouver sur {user_info['computer_name']}. Je suis maintenant en écoute permanente. Dites 'jarvis' puis votre demande pour m'activer. Si je vous pose une question, vous pouvez répondre directement !"
+                self.voice_manager.speak(welcome_speech)
         else:
-            print("⌨️ Mode texte activé (vocal indisponible)")
+            print(f"⌨️ {user_info['greeting']} ! Mode texte activé (vocal indisponible)")
+            print(f"💻 Ravi de vous retrouver sur {user_info['computer_name']}")
             print("Tapez 'quit' ou 'exit' pour quitter")
             print("Tapez 'clear' pour effacer l'historique")
             print("Tapez 'voice' pour réessayer le mode vocal")
@@ -431,3 +436,53 @@ class ChatInterface:
             return self.client.chat(query)
         except Exception as e:
             return f"Erreur: {str(e)}"
+    
+    def _get_user_info_for_welcome(self) -> dict:
+        """
+        Récupère les informations utilisateur pour personnaliser l'accueil
+        
+        Returns:
+            dict: Informations d'accueil personnalisées
+        """
+        try:
+            # Utiliser le tool manager pour obtenir les infos utilisateur
+            result = self.tool_manager.execute_tool("get_user_info", {"info_type": "all"})
+            
+            if result.get("success", False):
+                greeting_name = result.get("greeting_name", "Utilisateur")
+                computer_name = result.get("computer_name", "votre ordinateur")
+                
+                # Déterminer la salutation selon l'heure
+                import datetime
+                current_hour = datetime.datetime.now().hour
+                
+                if 5 <= current_hour < 12:
+                    greeting = f"Bonjour {greeting_name}"
+                elif 12 <= current_hour < 18:
+                    greeting = f"Bon après-midi {greeting_name}"
+                elif 18 <= current_hour < 22:
+                    greeting = f"Bonsoir {greeting_name}"
+                else:
+                    greeting = f"Bonne nuit {greeting_name}"
+                
+                return {
+                    "greeting": greeting,
+                    "computer_name": computer_name,
+                    "user_name": greeting_name
+                }
+            else:
+                # Fallback en cas d'erreur
+                return {
+                    "greeting": "Bonjour",
+                    "computer_name": "votre ordinateur",
+                    "user_name": "Utilisateur"
+                }
+                
+        except Exception as e:
+            print(f"⚠️ Erreur lors de la récupération des infos utilisateur: {e}")
+            # Fallback de sécurité
+            return {
+                "greeting": "Bonjour",
+                "computer_name": "votre ordinateur", 
+                "user_name": "Utilisateur"
+            }

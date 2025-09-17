@@ -316,6 +316,10 @@ SYSTÈME → Mots-clés: "infos", "système", "mémoire", "processus", "état"
 → Action: Combinaison get_system_info + get_memory_info + get_cpu_info
 → Stratégie: Analyse complète avec synthèse
 
+PERSONNALISATION → Mots-clés: "bonjour", "salut", "hello", "hey", première interaction
+→ Action: get_user_info("all") pour obtenir le nom et personnaliser
+→ Stratégie: Salutation personnalisée avec nom réel de l'utilisateur
+
 RECHERCHE → Mots-clés: "cherche", "trouve", "recherche", "liste"
 → Action: find_files_terminal pour fichiers, search_files pour contenu
 → Stratégie: Choix automatique selon le contexte
@@ -342,7 +346,15 @@ RÉSULTAT: Liste + statistiques (nombre, taille totale, plus gros fichier)
 
 SCÉNARIO: "Édite [fichier] pour remplacer [ancien] par [nouveau]"
 WORKFLOW: read_file([fichier]) → find_and_replace([fichier], [ancien], [nouveau])
-RÉSULTAT: Confirmation du nombre de remplacements effectués""")
+RÉSULTAT: Confirmation du nombre de remplacements effectués
+
+SCÉNARIO: Première interaction ou salutation ("bonjour", "salut", "hello")
+WORKFLOW: get_user_info("all") → Salutation personnalisée avec nom réel
+RÉSULTAT: "Bonjour [Nom réel] ! Comment puis-je vous aider aujourd'hui ?"
+
+SCÉNARIO: Questions sur l'utilisateur ("qui suis-je", "mon nom", "mon Mac")
+WORKFLOW: get_user_info("all") → Présentation complète des informations
+RÉSULTAT: Informations utilisateur et ordinateur formatées""")
 
         # === SECTION 5: PROTOCOLE D'EFFICACITÉ MAXIMALE ===
         prompt_sections.append("""
@@ -374,7 +386,13 @@ DEMANDE: "Calcule 15 * 8 + 32"
 RÉPONSE OPTIMALE: [calculate("15 * 8 + 32")] "15 × 8 + 32 = 152"
 
 DEMANDE: "Liste mes fichiers"
-RÉPONSE OPTIMALE: [list_files()] "Voici vos fichiers : [résultats formatés]" """)
+RÉPONSE OPTIMALE: [list_files()] "Voici vos fichiers : [résultats formatés]"
+
+DEMANDE: "Bonjour"
+RÉPONSE OPTIMALE: [get_user_info("all")] "Bonjour [Nom] ! Ravi de vous revoir sur votre [Mac]. Comment puis-je vous aider ?"
+
+DEMANDE: "Comment je m'appelle ?"
+RÉPONSE OPTIMALE: [get_user_info("all")] "Vous êtes [Nom complet], sur l'ordinateur '[Nom Mac]'." """)
 
         # === SECTION 6: SÉCURITÉ ET GESTION D'ERREURS ===
         prompt_sections.append("""
