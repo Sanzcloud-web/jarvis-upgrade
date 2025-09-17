@@ -54,6 +54,7 @@ class ToolManager:
             
             # Commandes système
             "execute_command": self.system_commands,
+            "execute_command_confirmed": self.system_commands,
             "get_system_info": self.system_commands,
             "get_disk_usage": self.system_commands,
             "get_memory_info": self.system_commands,
@@ -146,6 +147,7 @@ class ToolManager:
             
             # Système
             "execute_command": "system_commands",
+            "execute_command_confirmed": "system_commands",
             "get_system_info": "system_commands",
             "get_disk_usage": "system_commands",
             "get_memory_info": "system_commands", 

@@ -47,7 +47,6 @@ class FileOperations:
                         "required": ["filename", "content"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -70,7 +69,6 @@ class FileOperations:
                         "required": ["filename"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -97,7 +95,6 @@ class FileOperations:
                         "required": ["filename", "new_content"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -124,7 +121,6 @@ class FileOperations:
                         "required": ["filename", "content"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -155,7 +151,6 @@ class FileOperations:
                         "required": ["source_filename", "target_filename"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -186,7 +181,6 @@ class FileOperations:
                         "required": ["source_filename", "target_filename"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -209,7 +203,6 @@ class FileOperations:
                         "required": ["filename"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -232,7 +225,6 @@ class FileOperations:
                         "required": ["filename"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             }
         ]

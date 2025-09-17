@@ -30,7 +30,6 @@ class DateTimeTools:
                         "required": [],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -61,7 +60,6 @@ class DateTimeTools:
                         "required": ["base_date"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -80,7 +78,6 @@ class DateTimeTools:
                         "required": ["birth_date"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -103,7 +100,6 @@ class DateTimeTools:
                         "required": [],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             }
         ]

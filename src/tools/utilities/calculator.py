@@ -33,7 +33,6 @@ class Calculator:
                         "required": ["expression"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -60,7 +59,6 @@ class Calculator:
                         "required": ["value", "from_unit", "to_unit"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -87,7 +85,6 @@ class Calculator:
                         "required": ["operation", "value1", "value2"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             }
         ]

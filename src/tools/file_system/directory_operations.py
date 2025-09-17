@@ -42,7 +42,6 @@ class DirectoryOperations:
                         "required": [],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -65,7 +64,6 @@ class DirectoryOperations:
                         "required": ["directory_name"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -92,7 +90,6 @@ class DirectoryOperations:
                         "required": ["directory_name"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -123,7 +120,6 @@ class DirectoryOperations:
                         "required": ["source_directory", "target_directory"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -150,7 +146,6 @@ class DirectoryOperations:
                         "required": ["pattern"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -169,7 +164,6 @@ class DirectoryOperations:
                         "required": [],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             }
         ]

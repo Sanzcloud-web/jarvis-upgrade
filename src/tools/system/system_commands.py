@@ -10,11 +10,13 @@ from pathlib import Path
 from typing import Dict, Any, List
 from datetime import datetime
 from ...utils.system_utils import system_detector, SystemType
+from .security_manager import SecurityManager
 
 class SystemCommands:
     def __init__(self):
         """Initialise les commandes système"""
         self.system_detector = system_detector
+        self.security_manager = SecurityManager()
 
     def get_tools_schema(self) -> List[Dict[str, Any]]:
         """Retourne les schémas des outils système"""
@@ -23,7 +25,7 @@ class SystemCommands:
                 "type": "function",
                 "function": {
                     "name": "execute_command",
-                    "description": "Exécute une commande système adaptée à l'OS",
+                    "description": "Exécute une commande système adaptée à l'OS avec protection de sécurité",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -43,7 +45,36 @@ class SystemCommands:
                         "required": ["command"],
                         "additionalProperties": False
                     },
-                    "strict": True
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "execute_command_confirmed",
+                    "description": "Exécute une commande dangereuse après confirmation de l'utilisateur",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "command": {
+                                "type": "string",
+                                "description": "Commande à exécuter"
+                            },
+                            "confirmed": {
+                                "type": "boolean",
+                                "description": "Confirmation explicite de l'utilisateur (doit être true)"
+                            },
+                            "capture_output": {
+                                "type": "boolean",
+                                "description": "Capturer la sortie de la commande"
+                            },
+                            "timeout": {
+                                "type": "integer",
+                                "description": "Timeout en secondes (défaut: 30)"
+                            }
+                        },
+                        "required": ["command", "confirmed"],
+                        "additionalProperties": False
+                    },
                 }
             },
             {
@@ -56,7 +87,6 @@ class SystemCommands:
                         "properties": {},
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -75,7 +105,6 @@ class SystemCommands:
                         "required": [],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -88,7 +117,6 @@ class SystemCommands:
                         "properties": {},
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -101,7 +129,6 @@ class SystemCommands:
                         "properties": {},
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -124,7 +151,6 @@ class SystemCommands:
                         "required": [],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -143,7 +169,6 @@ class SystemCommands:
                         "required": ["application"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -162,7 +187,6 @@ class SystemCommands:
                         "required": ["url"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -193,7 +217,6 @@ class SystemCommands:
                         "required": ["search_pattern"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -216,7 +239,6 @@ class SystemCommands:
                         "required": ["task_description"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             }
         ]
@@ -226,6 +248,7 @@ class SystemCommands:
         try:
             method_map = {
                 "execute_command": self._execute_command,
+                "execute_command_confirmed": self._execute_command_confirmed,
                 "get_system_info": self._get_system_info,
                 "get_disk_usage": self._get_disk_usage,
                 "get_memory_info": self._get_memory_info,
@@ -245,8 +268,121 @@ class SystemCommands:
             return {"success": False, "error": f"Erreur lors de l'exécution: {str(e)}"}
 
     def _execute_command(self, command: str, capture_output: bool = True, timeout: int = 30) -> Dict[str, Any]:
-        """Exécute une commande système"""
+        """Exécute une commande système avec protection de sécurité"""
         try:
+            # ÉTAPE 1: Analyse de sécurité
+            security_analysis = self.security_manager.analyze_command(command)
+            
+            # ÉTAPE 2: Vérifier si la commande est bloquée
+            if security_analysis["blocked"]:
+                return {
+                    "success": False,
+                    "error": "Commande bloquée pour des raisons de sécurité",
+                    "security_report": self.security_manager.format_security_report(security_analysis),
+                    "risk_level": security_analysis["risk_level"],
+                    "issues": security_analysis["issues"],
+                    "command": command
+                }
+            
+            # ÉTAPE 3: Demander confirmation si nécessaire
+            if security_analysis["requires_confirmation"]:
+                confirmation_message = security_analysis.get("confirmation_message", 
+                    "Cette commande est potentiellement dangereuse. Voulez-vous continuer ?")
+                
+                return {
+                    "success": False,
+                    "error": "Confirmation requise avant exécution",
+                    "requires_confirmation": True,
+                    "confirmation_message": confirmation_message,
+                    "security_report": self.security_manager.format_security_report(security_analysis),
+                    "risk_level": security_analysis["risk_level"],
+                    "command": command,
+                    "note": "Pour exécuter cette commande, utilisez 'execute_command_confirmed' avec le paramètre 'confirmed=true'"
+                }
+            
+            # ÉTAPE 4: Exécuter la commande si elle est sûre
+            if capture_output:
+                result = subprocess.run(
+                    command,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout
+                )
+                
+                response = {
+                    "success": result.returncode == 0,
+                    "return_code": result.returncode,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                    "command": command
+                }
+                
+                # Ajouter l'info de sécurité si pertinente
+                if security_analysis["risk_level"] != "low":
+                    response["security_info"] = {
+                        "risk_level": security_analysis["risk_level"],
+                        "issues": security_analysis["issues"]
+                    }
+                
+                return response
+            else:
+                result = subprocess.run(command, shell=True, timeout=timeout)
+                response = {
+                    "success": result.returncode == 0,
+                    "return_code": result.returncode,
+                    "command": command,
+                    "message": "Commande exécutée (sortie non capturée)"
+                }
+                
+                if security_analysis["risk_level"] != "low":
+                    response["security_info"] = {
+                        "risk_level": security_analysis["risk_level"],
+                        "issues": security_analysis["issues"]
+                    }
+                
+                return response
+                
+        except subprocess.TimeoutExpired:
+            return {"success": False, "error": f"Timeout après {timeout} secondes"}
+        except Exception as e:
+            return {"success": False, "error": f"Erreur lors de l'exécution: {str(e)}"}
+
+    def _execute_command_confirmed(self, command: str, confirmed: bool, capture_output: bool = True, timeout: int = 30) -> Dict[str, Any]:
+        """Exécute une commande dangereuse après confirmation explicite"""
+        try:
+            # Vérifier que la confirmation est explicite
+            if not confirmed:
+                return {
+                    "success": False,
+                    "error": "Confirmation requise: le paramètre 'confirmed' doit être true",
+                    "command": command,
+                    "note": "Cette commande nécessite une confirmation explicite pour des raisons de sécurité"
+                }
+            
+            # Analyser la sécurité même en mode confirmé
+            security_analysis = self.security_manager.analyze_command(command)
+            
+            # Bloquer les commandes critiques même avec confirmation
+            if security_analysis["blocked"]:
+                return {
+                    "success": False,
+                    "error": "Commande bloquée définitivement pour des raisons de sécurité",
+                    "security_report": self.security_manager.format_security_report(security_analysis),
+                    "risk_level": security_analysis["risk_level"],
+                    "command": command,
+                    "note": "Cette commande est trop dangereuse même avec confirmation"
+                }
+            
+            # Exécuter avec avertissement de sécurité
+            print(f"\n⚠️  EXÉCUTION CONFIRMÉE D'UNE COMMANDE À RISQUE ⚠️")
+            print(f"🔸 Commande: {command}")
+            print(f"🔸 Risque: {security_analysis['risk_level'].upper()}")
+            if security_analysis["issues"]:
+                print(f"🔸 Problèmes: {', '.join(security_analysis['issues'])}")
+            print(f"🔸 Exécution en cours...\n")
+            
+            # Exécuter la commande
             if capture_output:
                 result = subprocess.run(
                     command,
@@ -261,7 +397,13 @@ class SystemCommands:
                     "return_code": result.returncode,
                     "stdout": result.stdout,
                     "stderr": result.stderr,
-                    "command": command
+                    "command": command,
+                    "execution_mode": "confirmed",
+                    "security_info": {
+                        "risk_level": security_analysis["risk_level"],
+                        "issues": security_analysis["issues"],
+                        "confirmed_by_user": True
+                    }
                 }
             else:
                 result = subprocess.run(command, shell=True, timeout=timeout)
@@ -269,12 +411,19 @@ class SystemCommands:
                     "success": result.returncode == 0,
                     "return_code": result.returncode,
                     "command": command,
-                    "message": "Commande exécutée (sortie non capturée)"
+                    "message": "Commande confirmée exécutée (sortie non capturée)",
+                    "execution_mode": "confirmed",
+                    "security_info": {
+                        "risk_level": security_analysis["risk_level"],
+                        "issues": security_analysis["issues"],
+                        "confirmed_by_user": True
+                    }
                 }
+                
         except subprocess.TimeoutExpired:
             return {"success": False, "error": f"Timeout après {timeout} secondes"}
         except Exception as e:
-            return {"success": False, "error": f"Erreur lors de l'exécution: {str(e)}"}
+            return {"success": False, "error": f"Erreur lors de l'exécution confirmée: {str(e)}"}
 
     def _get_system_info(self) -> Dict[str, Any]:
         """Obtient les informations système"""

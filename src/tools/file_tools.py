@@ -32,7 +32,6 @@ class FileTools:
                         "required": ["filename", "content"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -45,7 +44,6 @@ class FileTools:
                         "properties": {},
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -64,7 +62,6 @@ class FileTools:
                         "required": ["filename"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -83,7 +80,6 @@ class FileTools:
                         "required": ["filename"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             }
         ]

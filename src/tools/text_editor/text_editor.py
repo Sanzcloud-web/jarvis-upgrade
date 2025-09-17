@@ -56,7 +56,6 @@ class TextEditor:
                         "required": ["filename", "search_text", "replace_text"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -87,7 +86,6 @@ class TextEditor:
                         "required": ["filename", "line_number", "text"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -118,7 +116,6 @@ class TextEditor:
                         "required": ["filename", "start_line"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -149,7 +146,6 @@ class TextEditor:
                         "required": ["filename", "line_number", "new_text"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -180,7 +176,6 @@ class TextEditor:
                         "required": ["filename"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             },
             {
@@ -215,7 +210,6 @@ class TextEditor:
                         "required": ["filename", "search_text"],
                         "additionalProperties": False
                     },
-                    "strict": True
                 }
             }
         ]
