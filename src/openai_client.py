@@ -71,6 +71,24 @@ class OpenAIClient:
 
                     # Exécuter l'outil
                     result = self.tool_manager.execute_tool(tool_name, tool_args)
+                    
+                    # Traitement spécial pour screenshot_and_analyze
+                    if tool_name == "screenshot_and_analyze" and result.get("requires_vision_analysis"):
+                        # Analyser l'image avec l'API Vision
+                        vision_result = self._analyze_image_with_vision(
+                            result.get("screenshot_base64"),
+                            result.get("analysis_prompt", "Que vois-tu dans cette image ?")
+                        )
+                        
+                        if vision_result.get("success"):
+                            # Fusionner les résultats
+                            result["vision_analysis"] = vision_result["analysis"]
+                            result["vision_success"] = True
+                            result["message"] = f"📸 Capture d'écran analysée: {vision_result['analysis']}"
+                        else:
+                            result["vision_success"] = False
+                            result["vision_error"] = vision_result.get("error", "Erreur inconnue")
+                            result["message"] = f"📸 Capture prise mais erreur d'analyse: {vision_result.get('error')}"
 
                     # Ajouter l'appel d'outil à l'historique
                     self.conversation_history.append({
@@ -279,7 +297,7 @@ OBJECTIF PRINCIPAL : Réaliser les demandes de l'utilisateur en utilisant automa
         category_descriptions = {
             "file_system": ("📁", "FICHIERS & DOSSIERS", "Création, lecture, modification, suppression de fichiers et dossiers"),
             "text_editor": ("📝", "ÉDITEUR AVANCÉ", "Édition sophistiquée avec recherche/remplacement et manipulation de lignes"),
-            "system": ("⚙️", "SYSTÈME & TERMINAL", "Commandes système, informations PC, ouverture d'applications"),
+            "system": ("⚙️", "SYSTÈME & TERMINAL", "Commandes système, informations PC, ouverture d'applications, VISION D'ÉCRAN"),
             "utilities": ("🔧", "UTILITAIRES", "Calculs, conversions, gestion du temps et dates")
         }
         
@@ -326,7 +344,11 @@ RECHERCHE → Mots-clés: "cherche", "trouve", "recherche", "liste"
 
 ÉDITION → Mots-clés: "édite", "modifie", "remplace", "change"
 → Action: read_file puis find_and_replace ou edit_file
-→ Stratégie: Vérification d'existence puis modification""")
+→ Stratégie: Vérification d'existence puis modification
+
+VISION D'ÉCRAN → Mots-clés: "écran", "screen", "capture", "vois", "regarde", "analyse mon écran"
+→ Action: screenshot_and_analyze avec prompt d'analyse personnalisé
+→ Stratégie: Capture automatique + analyse IA intelligente""")
 
         # === SECTION 4: WORKFLOWS AUTOMATISÉS ===
         prompt_sections.append("""
@@ -354,7 +376,19 @@ RÉSULTAT: "Bonjour [Nom réel] ! Comment puis-je vous aider aujourd'hui ?"
 
 SCÉNARIO: Questions sur l'utilisateur ("qui suis-je", "mon nom", "mon Mac")
 WORKFLOW: get_user_info("all") → Présentation complète des informations
-RÉSULTAT: Informations utilisateur et ordinateur formatées""")
+RÉSULTAT: Informations utilisateur et ordinateur formatées
+
+SCÉNARIO: Demande d'analyse d'écran ("que vois-tu ?", "analyse mon écran", "aide-moi avec ça")
+WORKFLOW: screenshot_and_analyze(analysis_prompt="Analyse détaillée") → Analyse IA
+RÉSULTAT: Description intelligente de ce qui est visible à l'écran
+
+SCÉNARIO: Aide contextuelle ("comment faire ça ?", "explique ce code", "que faire ?")
+WORKFLOW: screenshot_and_analyze(analysis_prompt="Aide et conseils") → Analyse + suggestions
+RÉSULTAT: Conseils basés sur le contenu visible à l'écran
+
+SCÉNARIO: Capture simple ("prends une capture", "screenshot")
+WORKFLOW: take_screenshot() → Sauvegarde sur le bureau
+RÉSULTAT: Confirmation de sauvegarde avec chemin du fichier""")
 
         # === SECTION 5: PROTOCOLE D'EFFICACITÉ MAXIMALE ===
         prompt_sections.append("""
@@ -392,7 +426,16 @@ DEMANDE: "Bonjour"
 RÉPONSE OPTIMALE: [get_user_info("all")] "Bonjour [Nom] ! Ravi de vous revoir sur votre [Mac]. Comment puis-je vous aider ?"
 
 DEMANDE: "Comment je m'appelle ?"
-RÉPONSE OPTIMALE: [get_user_info("all")] "Vous êtes [Nom complet], sur l'ordinateur '[Nom Mac]'." """)
+RÉPONSE OPTIMALE: [get_user_info("all")] "Vous êtes [Nom complet], sur l'ordinateur '[Nom Mac]'."
+
+DEMANDE: "Que vois-tu sur mon écran ?"
+RÉPONSE OPTIMALE: [screenshot_and_analyze("Décris ce que tu vois")] "📸 Je vois [description détaillée de l'écran]"
+
+DEMANDE: "Aide-moi avec ce code"
+RÉPONSE OPTIMALE: [screenshot_and_analyze("Analyse ce code et donne des conseils")] "📸 Je vois du code [langage]. Voici mes suggestions : [conseils]"
+
+DEMANDE: "Prends une capture d'écran"
+RÉPONSE OPTIMALE: [take_screenshot()] "📸 Capture sauvegardée : /Users/[user]/Desktop/screenshot_[timestamp].png" """)
 
         # === SECTION 6: SÉCURITÉ ET GESTION D'ERREURS ===
         prompt_sections.append("""
@@ -441,3 +484,72 @@ TU: [find_files_terminal(pattern="jpg,png")] [get_directory_size()]
 Réponds TOUJOURS en français avec des actions concrètes et mesurables.""")
 
         return "\n".join(prompt_sections)
+    
+    def _analyze_image_with_vision(self, base64_image: str, analysis_prompt: str) -> Dict[str, Any]:
+        """
+        Analyse une image avec l'API Vision d'OpenAI
+        
+        Args:
+            base64_image: Image encodée en base64
+            analysis_prompt: Prompt pour l'analyse
+            
+        Returns:
+            Résultat de l'analyse
+        """
+        try:
+            if not base64_image:
+                return {"success": False, "error": "Aucune image fournie"}
+            
+            # Préparer le message pour l'API Vision
+            vision_messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"Analyse cette capture d'écran et réponds à cette demande: {analysis_prompt}"
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{base64_image}",
+                                "detail": "high"
+                            }
+                        }
+                    ]
+                }
+            ]
+            
+            # Appel à l'API Vision (utiliser gpt-4-vision-preview ou gpt-4o)
+            vision_response = self.client.chat.completions.create(
+                model="gpt-4o",  # Modèle avec capacités vision
+                messages=vision_messages,
+                max_tokens=1000,
+                temperature=0.3
+            )
+            
+            analysis_text = vision_response.choices[0].message.content
+            
+            return {
+                "success": True,
+                "analysis": analysis_text,
+                "model_used": "gpt-4o",
+                "tokens_used": vision_response.usage.total_tokens if hasattr(vision_response, 'usage') else None
+            }
+            
+        except Exception as e:
+            error_msg = str(e)
+            
+            # Messages d'erreur plus spécifiques
+            if "insufficient_quota" in error_msg:
+                error_msg = "Quota insuffisant pour l'API Vision. Vérifiez votre plan OpenAI."
+            elif "model_not_found" in error_msg:
+                error_msg = "Modèle Vision non disponible. Votre plan OpenAI supporte-t-il gpt-4o ?"
+            elif "invalid_request_error" in error_msg:
+                error_msg = "Erreur de requête. L'image est peut-être trop grande ou mal formatée."
+            
+            return {
+                "success": False,
+                "error": f"Erreur API Vision: {error_msg}",
+                "raw_error": str(e)
+            }

@@ -11,16 +11,18 @@ from typing import Dict, Any, List
 from datetime import datetime
 from ...utils.system_utils import system_detector, SystemType
 from .security_manager import SecurityManager
+from .screen_vision import ScreenVision
 
 class SystemCommands:
     def __init__(self):
         """Initialise les commandes système"""
         self.system_detector = system_detector
         self.security_manager = SecurityManager()
+        self.screen_vision = ScreenVision()
 
     def get_tools_schema(self) -> List[Dict[str, Any]]:
         """Retourne les schémas des outils système"""
-        return [
+        system_schemas = [
             {
                 "type": "function",
                 "function": {
@@ -261,6 +263,10 @@ class SystemCommands:
                 }
             }
         ]
+        
+        # Ajouter les outils de vision d'écran
+        vision_schemas = self.screen_vision.get_tools_schema()
+        return system_schemas + vision_schemas
 
     def execute_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Exécute un outil avec les arguments donnés"""
@@ -282,6 +288,9 @@ class SystemCommands:
             
             if tool_name in method_map:
                 return method_map[tool_name](**arguments)
+            elif tool_name in ["screenshot_and_analyze", "take_screenshot", "get_screen_info"]:
+                # Déléguer aux outils de vision d'écran
+                return self.screen_vision.execute_tool(tool_name, arguments)
             else:
                 return {"success": False, "error": f"Outil inconnu: {tool_name}"}
         except Exception as e:

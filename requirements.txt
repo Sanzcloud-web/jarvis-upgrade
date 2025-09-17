@@ -8,3 +8,5 @@ numpy
 gtts
 keyboard
 psutil==5.9.8
+pillow==10.4.0
+pyautogui==0.9.54
