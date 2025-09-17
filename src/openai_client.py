@@ -4,7 +4,7 @@ import json
 from openai import OpenAI
 from dotenv import load_dotenv
 from typing import Optional, List, Dict, Any
-from .tools import FileTools
+from .tools import ToolManager
 
 class OpenAIClient:
     def __init__(self):
@@ -18,14 +18,33 @@ class OpenAIClient:
         self.client = OpenAI(api_key=self.api_key)
         self.conversation_history = []
 
-        # Initialiser les outils
-        self.file_tools = FileTools()
-        self.tools = self.file_tools.get_tools_schema()
+        # Initialiser le gestionnaire d'outils
+        self.tool_manager = ToolManager()
+        self.tools = self.tool_manager.get_all_tools_schema()
 
         # Prompt système pour JARVIS
         self.system_prompt = """Tu es JARVIS, un assistant IA français intelligent et serviable.
-Tu peux utiliser des outils pour interagir avec les fichiers du bureau de l'utilisateur.
-Réponds toujours en français et sois précis dans tes réponses."""
+
+CAPACITÉS DISPONIBLES :
+- 📁 Gestion complète des fichiers et dossiers (créer, éditer, déplacer, supprimer, etc.)
+- 📝 Éditeur de texte avancé (recherche/remplacement, insertion de lignes, etc.)  
+- ⚙️ Commandes système (informations PC, mémoire, processus, ouvrir applications/URLs)
+- 🕒 Outils de date/heure (calendrier, calculs d'âge, ajouts de temps)
+- 🧮 Calculatrice avancée (expressions mathématiques, conversions d'unités, pourcentages)
+
+INSTRUCTIONS IMPORTANTES :
+1. Tu peux utiliser PLUSIEURS outils en séquence pour accomplir des tâches complexes
+2. Pour ouvrir des applications, utilise execute_command avec des commandes de recherche intelligente
+3. Utilise execute_command pour des tâches système flexibles (recherche de fichiers, etc.)
+4. Ne crée jamais de fichiers de test automatiquement - seulement si l'utilisateur le demande explicitement
+5. Sois proactif : si l'utilisateur demande "crée un dossier avec un fichier dedans", fais les deux actions
+
+EXEMPLES D'UTILISATION MULTI-OUTILS :
+- "Crée un dossier 'test' avec un fichier 'histoire.txt' dedans" → create_directory puis create_file
+- "Trouve et ouvre Chrome" → execute_command pour chercher puis execute_command pour ouvrir
+- "Montre-moi les gros fichiers du bureau" → list_files puis filtrage
+
+Réponds toujours en français avec des explications claires de ce que tu fais."""
 
     def chat(self, message: str, use_tools: bool = True) -> str:
         """
@@ -65,7 +84,7 @@ Réponds toujours en français et sois précis dans tes réponses."""
                     tool_args = json.loads(tool_call.function.arguments)
 
                     # Exécuter l'outil
-                    result = self.file_tools.execute_tool(tool_name, tool_args)
+                    result = self.tool_manager.execute_tool(tool_name, tool_args)
 
                     # Ajouter l'appel d'outil à l'historique
                     self.conversation_history.append({

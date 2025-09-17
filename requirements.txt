@@ -7,3 +7,4 @@ pyaudio==0.2.14
 numpy
 gtts
 keyboard
+psutil==5.9.8

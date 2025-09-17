@@ -4,6 +4,8 @@ import os
 from typing import Optional
 from .openai_client import OpenAIClient
 from .voice_manager import VoiceManager
+from .tools.tool_manager import ToolManager
+import time
 
 class ChatInterface:
     def __init__(self):
@@ -11,6 +13,9 @@ class ChatInterface:
         self.voice_manager = None
         self.voice_mode = False
         self.running = True
+        
+        # Initialiser le gestionnaire d'outils
+        self.tool_manager = ToolManager()
 
         # Initialiser automatiquement le mode vocal
         self.auto_init_voice()
@@ -41,6 +46,7 @@ class ChatInterface:
             print("💬 Dites 'JARVIS quitter' ou 'JARVIS arrêter le service' pour m'arrêter")
             print("🔄 Dites 'JARVIS mode texte' pour basculer en écriture")
             print("🌐 Dites 'JARVIS recherche ...' pour chercher sur internet")
+            print("🛠️ Dites 'JARVIS outils' pour voir tous mes outils disponibles")
             print("🎯 Je ne réponds qu'aux phrases commençant par 'JARVIS'")
             print("🤔 NOUVEAU: Si je pose une question (?), répondez sans redire 'JARVIS' !")
 
@@ -52,6 +58,8 @@ class ChatInterface:
             print("Tapez 'quit' ou 'exit' pour quitter")
             print("Tapez 'clear' pour effacer l'historique")
             print("Tapez 'voice' pour réessayer le mode vocal")
+            print("Tapez 'outils' pour voir tous les outils disponibles")
+            print("Tapez 'test outils' pour tester les fonctionnalités")
 
         print("-" * 60)
 
@@ -104,6 +112,19 @@ class ChatInterface:
         elif command in ['test-voice', 'test vocal']:
             self.test_voice_system()
             return True
+        
+        elif command in ['outils', 'tools', 'aide outils']:
+            self.show_tools_help()
+            return True
+        
+        elif command.startswith('outil '):
+            tool_name = user_input[6:].strip()
+            self.show_tool_help(tool_name)
+            return True
+        
+        elif command == 'test outils':
+            self.test_tools()
+            return True
 
         elif command.startswith('recherche '):
             query = user_input[10:].strip()  # Enlever "recherche "
@@ -139,6 +160,101 @@ class ChatInterface:
             return True
 
         return False
+    
+    def show_tools_help(self):
+        """Affiche l'aide des outils disponibles"""
+        print("\n🛠️ === OUTILS JARVIS DISPONIBLES ===")
+        
+        help_data = self.tool_manager.get_tool_help()
+        if help_data["success"]:
+            print(f"📊 Total: {help_data['total_tools']} outils disponibles\n")
+            
+            for category, tools in help_data["categories"].items():
+                category_names = {
+                    "file_operations": "📁 Opérations sur les fichiers",
+                    "directory_operations": "📂 Gestion des dossiers", 
+                    "text_editor": "📝 Éditeur de texte avancé",
+                    "system_commands": "⚙️ Commandes système",
+                    "datetime_tools": "🕒 Outils de date/heure",
+                    "calculator": "🧮 Calculatrice"
+                }
+                
+                print(f"{category_names.get(category, category.upper())}:")
+                for tool in tools:
+                    print(f"  • {tool['name']} - {tool['description']}")
+                print()
+            
+            print("💡 Tapez 'outil [nom]' pour plus d'infos sur un outil spécifique")
+            print("💡 Tapez 'test outils' pour tester quelques outils")
+        else:
+            print(f"❌ Erreur: {help_data['error']}")
+    
+    def show_tool_help(self, tool_name: str):
+        """Affiche l'aide pour un outil spécifique"""
+        help_data = self.tool_manager.get_tool_help(tool_name)
+        
+        if help_data["success"]:
+            print(f"\n🛠️ === OUTIL: {tool_name.upper()} ===")
+            print(f"📂 Catégorie: {help_data['category']}")
+            print(f"📝 Description: {help_data['description']}")
+            print(f"\n📋 Paramètres:")
+            
+            for param_name, param_info in help_data["parameters"].items():
+                required = " (REQUIS)" if param_name in help_data["required_parameters"] else " (optionnel)"
+                print(f"  • {param_name}{required}: {param_info.get('description', 'Pas de description')}")
+                if "type" in param_info:
+                    print(f"    Type: {param_info['type']}")
+        else:
+            print(f"❌ Erreur: {help_data['error']}")
+    
+    def test_tools(self):
+        """Teste quelques outils de base"""
+        print("\n🧪 === TEST DES OUTILS JARVIS ===")
+        
+        tests = [
+            {
+                "name": "Heure actuelle",
+                "tool": "get_current_time", 
+                "args": {"format": "french"}
+            },
+            {
+                "name": "Calcul simple",
+                "tool": "calculate",
+                "args": {"expression": "15 + 25 * 2"}
+            },
+            {
+                "name": "Infos système",
+                "tool": "get_system_info",
+                "args": {}
+            },
+            {
+                "name": "Liste fichiers",
+                "tool": "list_files",
+                "args": {}
+            }
+        ]
+        
+        for test in tests:
+            print(f"\n🔍 Test: {test['name']}")
+            result = self.tool_manager.execute_tool(test["tool"], test["args"])
+            
+            if result["success"]:
+                print(f"✅ Succès!")
+                # Afficher quelques infos clés selon le type de résultat
+                if "current_time" in result:
+                    print(f"   Heure: {result['current_time']}")
+                elif "result" in result:
+                    print(f"   Résultat: {result['result']}")
+                elif "system_info" in result:
+                    info = result["system_info"]
+                    print(f"   OS: {info.get('system', 'Inconnu')}")
+                    print(f"   Architecture: {info.get('architecture', 'Inconnu')}")
+                elif "items" in result:
+                    print(f"   {result.get('files_count', 0)} fichiers trouvés")
+            else:
+                print(f"❌ Échec: {result['error']}")
+        
+        print(f"\n🎉 Tests terminés! Utilisez 'outils' pour voir tous les outils disponibles.")
 
     def init_voice_manager(self):
         """Initialise le gestionnaire vocal"""
