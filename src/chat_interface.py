@@ -37,14 +37,15 @@ class ChatInterface:
 
         if self.voice_mode:
             print("🗣️ Bonjour ! Je suis JARVIS, votre assistant vocal.")
-            print("🎤 PARLEZ-MOI directement - je vous écoute !")
-            print("💬 Dites 'quitter' ou 'au revoir' pour arrêter")
-            print("🔄 Dites 'mode texte' pour basculer en écriture")
-            print("🌐 Dites 'recherche' suivi de votre question pour chercher sur internet")
+            print("🎤 EN ÉCOUTE PERMANENTE - Dites 'JARVIS' pour m'activer !")
+            print("💬 Dites 'JARVIS quitter' ou 'JARVIS arrêter le service' pour m'arrêter")
+            print("🔄 Dites 'JARVIS mode texte' pour basculer en écriture")
+            print("🌐 Dites 'JARVIS recherche ...' pour chercher sur internet")
+            print("🎯 Je ne réponds qu'aux phrases commençant par 'JARVIS'")
 
             # Faire parler JARVIS si le mode vocal fonctionne
             if self.voice_manager:
-                self.voice_manager.speak("Bonjour ! Je suis JARVIS, votre assistant vocal. Vous pouvez me parler directement !")
+                self.voice_manager.speak("Bonjour ! Je suis JARVIS. Je suis maintenant en écoute permanente. Dites 'jarvis' puis votre demande pour m'activer.")
         else:
             print("⌨️ Mode texte activé (vocal indisponible)")
             print("Tapez 'quit' ou 'exit' pour quitter")
@@ -77,26 +78,47 @@ class ChatInterface:
         """
         command = user_input.lower().strip()
 
-        if command in ['quit', 'exit']:
+        if command in ['quit', 'exit', 'quitter', 'au revoir']:
             print("\n👋 Au revoir !")
+            if self.voice_mode and self.voice_manager:
+                self.voice_manager.speak("Au revoir !")
             self.running = False
             return True
 
-        elif command == 'clear':
+        elif command in ['clear', 'effacer']:
             self.client.clear_history()
             print("\n🗑️ Historique effacé !")
+            if self.voice_mode and self.voice_manager:
+                self.voice_manager.speak("Historique effacé.")
             return True
 
-        elif command == 'help':
+        elif command in ['help', 'aide']:
             self.display_help()
             return True
 
-        elif command == 'voice':
+        elif command in ['voice', 'mode texte']:
             self.toggle_voice_mode()
             return True
 
-        elif command == 'test-voice':
+        elif command in ['test-voice', 'test vocal']:
             self.test_voice_system()
+            return True
+
+        elif command.startswith('recherche '):
+            query = user_input[10:].strip()  # Enlever "recherche "
+            if query:
+                print(f"\n🌐 Recherche: {query}")
+                print("⏳ Recherche en cours...")
+                if self.voice_mode and self.voice_manager:
+                    self.voice_manager.speak(f"Je recherche des informations sur {query}")
+                response = self.client.chat(f"Recherche des informations sur: {query}")
+                print(f"\n🤖 Résultat: {response}\n")
+                if self.voice_mode and self.voice_manager:
+                    self.voice_manager.speak(response)
+            else:
+                print("❌ Veuillez spécifier votre recherche après 'recherche'")
+                if self.voice_mode and self.voice_manager:
+                    self.voice_manager.speak("Veuillez spécifier votre recherche.")
             return True
 
         elif command.startswith('web:'):
@@ -193,30 +215,82 @@ class ChatInterface:
 
         print("-" * 60)
 
+    def handle_voice_command(self, user_input: str):
+        """Traite une commande vocale détectée avec le mot-clé JARVIS"""
+        print(f"🎯 Commande reçue: {user_input}")
+        
+        # Vérifier les commandes d'arrêt spéciales
+        if any(word in user_input.lower() for word in ['quitter', 'arrêter le service', 'au revoir', 'stop service']):
+            print("🔇 Arrêt du service JARVIS...")
+            if self.voice_manager:
+                self.voice_manager.speak("Au revoir ! Service JARVIS arrêté.")
+            self.running = False
+            return
+            
+        # Vérifier si c'est une commande spéciale
+        if self.process_command(user_input):
+            return
+
+        # Traitement normal du message
+        print("⏳ JARVIS réfléchit...")
+        try:
+            response = self.client.chat(user_input)
+            self.display_response(response)
+        except Exception as e:
+            print(f"❌ Erreur: {str(e)}")
+            if self.voice_manager:
+                self.voice_manager.speak("Désolé, j'ai rencontré une erreur. Pouvez-vous répéter ?")
+            print("Veuillez réessayer ou vérifier votre configuration.\n")
+
     def run(self):
         """
-        Lance l'interface de chat
+        Lance l'interface de chat avec écoute permanente en mode vocal
         """
         self.display_welcome()
 
-        while self.running:
-            user_input = self.get_user_input()
-
-            if not user_input or not self.running:
-                break
-
-            # Vérifier si c'est une commande spéciale
-            if self.process_command(user_input):
-                continue
-
-            # Traitement normal du message
-            print("⏳ JARVIS réfléchit...")
+        if self.voice_mode and self.voice_manager:
+            # Mode vocal : écoute continue permanente
+            print("🎤 Écoute permanente activée - En attente de 'JARVIS'...")
+            print("📱 Le service fonctionne maintenant en arrière-plan")
+            print("💡 Appuyez sur [CTRL+C] pour arrêter le service manuellement")
+            print("=" * 60)
+            
             try:
-                response = self.client.chat(user_input)
-                self.display_response(response)
-            except Exception as e:
-                print(f"❌ Erreur: {str(e)}")
-                print("Veuillez réessayer ou vérifier votre configuration.\n")
+                # Lancer l'écoute continue avec callback
+                self.voice_manager.listen_continuous(self.handle_voice_command)
+                
+                # Boucle d'attente tant que le service tourne
+                import time
+                while self.running:
+                    time.sleep(0.5)  # Éviter d'utiliser trop de CPU
+                    
+            except KeyboardInterrupt:
+                print("\n\n🔇 Service JARVIS arrêté manuellement")
+                self.running = False
+            finally:
+                if self.voice_manager:
+                    self.voice_manager.stop_listening()
+                    
+        else:
+            # Mode texte : comportement classique
+            while self.running:
+                user_input = self.get_user_input()
+
+                if not user_input or not self.running:
+                    break
+
+                # Vérifier si c'est une commande spéciale
+                if self.process_command(user_input):
+                    continue
+
+                # Traitement normal du message
+                print("⏳ JARVIS réfléchit...")
+                try:
+                    response = self.client.chat(user_input)
+                    self.display_response(response)
+                except Exception as e:
+                    print(f"❌ Erreur: {str(e)}")
+                    print("Veuillez réessayer ou vérifier votre configuration.\n")
 
     def run_single_query(self, query: str) -> str:
         """

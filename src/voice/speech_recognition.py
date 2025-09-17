@@ -52,7 +52,8 @@ class SpeechRecognizer:
                 print(f"👋 Bonjour ! Dites 'jarvis' suivi de votre demande.")
                 return None
         else:
-            print(f"💤 Mot-clé '{self.wake_word}' non détecté au début - Ignoré")
+            # Mode silencieux en arrière-plan - ne pas afficher de message
+            # print(f"💤 Mot-clé '{self.wake_word}' non détecté au début - Ignoré")
             return None
 
     def listen_once(self, timeout: int = 5) -> Optional[str]:
@@ -70,7 +71,10 @@ class SpeechRecognizer:
 
             # Reconnaissance vocale français
             raw_text = self.recognizer.recognize_google(audio, language='fr-FR')
-            print(f"📝 Reconnu: {raw_text}")
+            
+            # En mode écoute ponctuelle, afficher ce qui est reconnu
+            if not hasattr(self, '_in_continuous_mode'):
+                print(f"📝 Reconnu: {raw_text}")
             
             # Vérifier le mot-clé d'activation
             processed_text = self.check_wake_word(raw_text)
@@ -92,8 +96,11 @@ class SpeechRecognizer:
     def listen_continuous(self, callback: Callable[[str], None]):
         """Écoute en continu et appelle le callback pour chaque phrase avec mot-clé"""
         def listen_worker():
+            # Marquer qu'on est en mode continu pour réduire les messages
+            self._in_continuous_mode = True
+            
             if self.require_wake_word:
-                print(f"🎤 Écoute continue activée - Dites '{self.wake_word}' pour interagir")
+                print(f"🎤 Écoute continue activée - En attente de '{self.wake_word}'...")
             else:
                 print("🎤 Écoute continue activée")
 
@@ -114,6 +121,8 @@ class SpeechRecognizer:
                         # Vérifier le mot-clé d'activation
                         processed_text = self.check_wake_word(raw_text)
                         if processed_text:
+                            # Afficher qu'on a reçu une commande valide
+                            print(f"📝 Audio reconnu: {raw_text}")
                             callback(processed_text)
 
                     except (sr.UnknownValueError, sr.RequestError):
@@ -132,6 +141,9 @@ class SpeechRecognizer:
     def stop_listening(self):
         """Arrête l'écoute continue"""
         self.is_listening = False
+        # Enlever le flag du mode continu
+        if hasattr(self, '_in_continuous_mode'):
+            delattr(self, '_in_continuous_mode')
     
     def set_wake_word_required(self, required: bool):
         """Active ou désactive l'exigence du mot-clé d'activation"""
