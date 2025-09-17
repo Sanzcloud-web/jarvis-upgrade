@@ -18,6 +18,15 @@ class TextToSpeech:
     
     def _init_tts_engine(self, speed_factor: float):
         """Initialise le moteur TTS avec gestion robuste des erreurs"""
+        # Configuration de vitesse optimale
+        if system_detector.is_macos:
+            # Vitesse parfaite pour macOS : 250 (équilibre optimal)
+            self.macos_speech_rate = 250
+            adjusted_speed_factor = 2.0  # Facteur pour pyttsx3 sur macOS
+        else:
+            adjusted_speed_factor = speed_factor
+            self.macos_speech_rate = 200
+            
         try:
             # Méthode 1: Initialisation standard
             self.engine = pyttsx3.init()
@@ -25,10 +34,19 @@ class TextToSpeech:
             
             # Configuration de la vitesse et du volume
             base_rate = self.engine.getProperty('rate')
-            self.engine.setProperty('rate', int(base_rate * speed_factor))
+            target_rate = int(base_rate * adjusted_speed_factor)
+            
+            # Configuration optimale pour macOS
+            if system_detector.is_macos:
+                final_rate = min(target_rate, 300)  # Vitesse optimisée
+            else:
+                final_rate = min(target_rate, 250)
+            
+            self.engine.setProperty('rate', final_rate)
             self.engine.setProperty('volume', 0.9)
             
-            print(f"✅ JARVIS TTS activé avec pyttsx3 sur {system_detector.system_type.value} (vitesse x{speed_factor})")
+            print(f"✅ JARVIS TTS activé avec pyttsx3 sur {system_detector.system_type.value}")
+            print(f"🏃 Vitesse optimale: {final_rate} | macOS 'say': {self.macos_speech_rate}")
             return
             
         except Exception as e:
@@ -41,17 +59,21 @@ class TextToSpeech:
                 self._configure_voice_for_system()
                 
                 base_rate = self.engine.getProperty('rate')
-                self.engine.setProperty('rate', int(base_rate * speed_factor))
+                target_rate = int(base_rate * adjusted_speed_factor)
+                final_rate = min(target_rate, 350)
+                
+                self.engine.setProperty('rate', final_rate)
                 self.engine.setProperty('volume', 0.9)
                 
-                print(f"✅ JARVIS TTS activé avec driver nsss sur macOS (vitesse x{speed_factor})")
+                print(f"✅ JARVIS TTS activé avec driver nsss sur macOS")
+                print(f"🏃 Vitesse configurée: {final_rate} (facteur: {adjusted_speed_factor:.1f})")
                 return
                 
             except Exception as e:
                 print(f"⚠️ Erreur driver nsss: {e}")
         
         # Méthode 3: Mode dégradé sans TTS
-        print(f"⚠️ TTS non disponible - mode texte seulement")
+        print(f"⚠️ TTS non disponible - utilisation commandes système")
         self.engine = None
 
     def _configure_voice_for_system(self):
@@ -164,10 +186,12 @@ class TextToSpeech:
             self.is_speaking = True
             
             if system_detector.is_macos:
-                # Sur macOS, utiliser la commande 'say'
+                # Sur macOS, utiliser la commande 'say' avec vitesse accélérée
                 safe_text = shlex.quote(text)
-                subprocess.run(['say', '-v', 'Thomas', text], check=True)
-                print("🔊 TTS via commande 'say' sur macOS")
+                # Utiliser -r pour la vitesse (rate) - valeurs entre 100-500, défaut ~200
+                speech_rate = getattr(self, 'macos_speech_rate', 280)
+                subprocess.run(['say', '-v', 'Thomas', '-r', str(speech_rate), text], check=True)
+                print(f"🔊 TTS via commande 'say' sur macOS (vitesse: {speech_rate})")
                 
             elif system_detector.is_windows:
                 # Sur Windows, utiliser PowerShell et SAPI
@@ -220,8 +244,29 @@ class TextToSpeech:
         if self.engine:
             try:
                 self.engine.setProperty('rate', rate)
+                print(f"🏃 Vitesse TTS mise à jour: {rate}")
             except:
                 pass
+        
+        # Mettre à jour aussi la vitesse pour les commandes système
+        if system_detector.is_macos:
+            # Adapter la vitesse pour la commande 'say' (conversion approximative)
+            self.macos_speech_rate = max(100, min(500, int(rate * 1.4)))
+            print(f"🍎 Vitesse macOS 'say' mise à jour: {self.macos_speech_rate}")
+    
+    def reset_optimal_speed(self):
+        """Remet la vitesse optimale (250 pour macOS)"""
+        if system_detector.is_macos:
+            self.macos_speech_rate = 250
+            print(f"🍎 Vitesse macOS optimale restaurée: {self.macos_speech_rate}")
+            
+            # Mettre à jour aussi pyttsx3 si disponible
+            if self.engine:
+                try:
+                    self.engine.setProperty('rate', 180)  # Équivalent pour pyttsx3
+                    print(f"🔄 Vitesse pyttsx3 optimisée: 180")
+                except:
+                    pass
 
     def set_volume(self, volume: float):
         """Modifie le volume (0.0 à 1.0)"""
