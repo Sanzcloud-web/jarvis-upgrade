@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import pyttsx3
+import pyttsx3  # pyright: ignore[reportMissingImports]
 import threading
 from typing import Optional
 from ..utils.system_utils import system_detector, SystemType

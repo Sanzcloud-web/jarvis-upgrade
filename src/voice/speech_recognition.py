@@ -4,6 +4,7 @@ import threading
 import queue
 import time
 from typing import Optional, Callable
+from datetime import datetime, timedelta
 
 class SpeechRecognizer:
     def __init__(self):
@@ -15,6 +16,11 @@ class SpeechRecognizer:
         # Configuration du mot-clé d'activation
         self.wake_word = "jarvis"
         self.require_wake_word = True
+        
+        # Gestion du contexte conversationnel
+        self.waiting_for_response = False
+        self.conversation_timeout = 30  # secondes
+        self.last_question_time = None
 
         # Calibrage automatique
         self.calibrate_microphone()
@@ -36,6 +42,21 @@ class SpeechRecognizer:
             
         if not text:
             return None
+        
+        # Vérifier si on attend une réponse et si le délai n'est pas dépassé
+        if self.waiting_for_response and self.last_question_time:
+            time_since_question = datetime.now() - self.last_question_time
+            if time_since_question.total_seconds() <= self.conversation_timeout:
+                # On accepte la réponse sans mot-clé
+                print(f"💬 Réponse reçue: '{text}'")
+                self.waiting_for_response = False  # Remettre en mode normal
+                self.last_question_time = None
+                return text
+            else:
+                # Timeout dépassé, revenir au mode normal
+                print(f"⏰ Délai de réponse dépassé, retour au mode normal")
+                self.waiting_for_response = False
+                self.last_question_time = None
             
         # Convertir en minuscules pour la comparaison
         text_lower = text.lower().strip()
@@ -158,3 +179,29 @@ class SpeechRecognizer:
         old_word = self.wake_word
         self.wake_word = wake_word.lower().strip()
         print(f"🔄 Mot-clé changé: '{old_word}' → '{self.wake_word}'")
+    
+    def enable_response_mode(self):
+        """Active le mode attente de réponse (après une question)"""
+        self.waiting_for_response = True
+        self.last_question_time = datetime.now()
+        print(f"🤔 Mode attente de réponse activé (timeout: {self.conversation_timeout}s)")
+    
+    def disable_response_mode(self):
+        """Désactive le mode attente de réponse"""
+        self.waiting_for_response = False
+        self.last_question_time = None
+        print(f"🔄 Retour au mode normal - mot-clé requis")
+    
+    def is_waiting_for_response(self) -> bool:
+        """Vérifie si on attend une réponse"""
+        if not self.waiting_for_response:
+            return False
+            
+        if self.last_question_time:
+            time_since_question = datetime.now() - self.last_question_time
+            if time_since_question.total_seconds() > self.conversation_timeout:
+                # Timeout dépassé
+                self.disable_response_mode()
+                return False
+        
+        return True

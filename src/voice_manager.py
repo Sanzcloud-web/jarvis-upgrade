@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import speech_recognition as sr
+import speech_recognition as sr  # pyright: ignore[reportMissingImports]
 import threading
 import queue
 import time
@@ -53,6 +53,18 @@ class VoiceManager:
     def disable_wake_word_temporarily(self):
         """Désactive temporairement le mot-clé (pour tests ou configuration)"""
         self.speech_recognizer.set_wake_word_required(False)
+    
+    def enable_response_mode(self):
+        """Active le mode attente de réponse conversationnelle"""
+        self.speech_recognizer.enable_response_mode()
+        
+    def disable_response_mode(self):
+        """Désactive le mode attente de réponse"""
+        self.speech_recognizer.disable_response_mode()
+        
+    def is_waiting_for_response(self) -> bool:
+        """Vérifie si on attend une réponse"""
+        return self.speech_recognizer.is_waiting_for_response()
 
     def listen_continuous(self, callback: Callable[[str], None]):
         """Écoute en continu avec activation par mot-clé JARVIS"""

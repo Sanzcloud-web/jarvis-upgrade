@@ -36,16 +36,17 @@ class ChatInterface:
         print("=" * 60)
 
         if self.voice_mode:
-            print("🗣️ Bonjour ! Je suis JARVIS, votre assistant vocal.")
+            print("🗣️ Bonjour ! Je suis JARVIS, votre assistant vocal intelligent.")
             print("🎤 EN ÉCOUTE PERMANENTE - Dites 'JARVIS' pour m'activer !")
             print("💬 Dites 'JARVIS quitter' ou 'JARVIS arrêter le service' pour m'arrêter")
             print("🔄 Dites 'JARVIS mode texte' pour basculer en écriture")
             print("🌐 Dites 'JARVIS recherche ...' pour chercher sur internet")
             print("🎯 Je ne réponds qu'aux phrases commençant par 'JARVIS'")
+            print("🤔 NOUVEAU: Si je pose une question (?), répondez sans redire 'JARVIS' !")
 
             # Faire parler JARVIS si le mode vocal fonctionne
             if self.voice_manager:
-                self.voice_manager.speak("Bonjour ! Je suis JARVIS. Je suis maintenant en écoute permanente. Dites 'jarvis' puis votre demande pour m'activer.")
+                self.voice_manager.speak("Bonjour ! Je suis JARVIS. Je suis maintenant en écoute permanente. Dites 'jarvis' puis votre demande pour m'activer. Si je vous pose une question, vous pouvez répondre directement !")
         else:
             print("⌨️ Mode texte activé (vocal indisponible)")
             print("Tapez 'quit' ou 'exit' pour quitter")
@@ -115,6 +116,11 @@ class ChatInterface:
                 print(f"\n🤖 Résultat: {response}\n")
                 if self.voice_mode and self.voice_manager:
                     self.voice_manager.speak(response)
+                    
+                    # Vérifier si c'est une question pour activer le mode attente
+                    if response.strip().endswith('?'):
+                        print("🤔 Question détectée - Vous pouvez répondre directement sans dire 'jarvis'")
+                        self.voice_manager.enable_response_mode()
             else:
                 print("❌ Veuillez spécifier votre recherche après 'recherche'")
                 if self.voice_mode and self.voice_manager:
@@ -212,6 +218,15 @@ class ChatInterface:
         # En mode vocal, faire parler JARVIS
         if self.voice_mode and self.voice_manager:
             self.voice_manager.speak(response)
+            
+            # Vérifier si JARVIS pose une question pour activer le mode attente
+            if response.strip().endswith('?'):
+                print("🤔 Question détectée - Vous pouvez répondre directement sans dire 'jarvis'")
+                self.voice_manager.enable_response_mode()
+            else:
+                # S'assurer qu'on est en mode normal si ce n'est pas une question
+                if self.voice_manager.is_waiting_for_response():
+                    self.voice_manager.disable_response_mode()
 
         print("-" * 60)
 
