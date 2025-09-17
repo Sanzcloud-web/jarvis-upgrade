@@ -5,6 +5,7 @@ import queue
 import time
 from typing import Optional, Callable
 from .voice.text_to_speech import TextToSpeech
+from .utils.system_utils import system_detector
 
 class VoiceManager:
     def __init__(self):
