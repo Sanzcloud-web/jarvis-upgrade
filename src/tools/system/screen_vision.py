@@ -244,8 +244,24 @@ class ScreenVision:
             else:
                 screenshot = pyautogui.screenshot()
             
+            # CORRECTION : Gérer la conversion si c'est un JPEG
+            if str(full_path).lower().endswith('.jpg') or str(full_path).lower().endswith('.jpeg'):
+                # Convertir RGBA vers RGB pour JPEG
+                if screenshot.mode in ('RGBA', 'LA'):
+                    background = Image.new('RGB', screenshot.size, (255, 255, 255))
+                    if screenshot.mode == 'RGBA':
+                        background.paste(screenshot, mask=screenshot.split()[-1])
+                    else:
+                        background.paste(screenshot, mask=screenshot.split()[-1])
+                    screenshot = background
+                elif screenshot.mode != 'RGB':
+                    screenshot = screenshot.convert('RGB')
+            
             # Sauvegarder
-            screenshot.save(str(full_path))
+            if str(full_path).lower().endswith('.jpg') or str(full_path).lower().endswith('.jpeg'):
+                screenshot.save(str(full_path), "JPEG", quality=90, optimize=True)
+            else:
+                screenshot.save(str(full_path))
             
             return {
                 "success": True,
@@ -299,7 +315,7 @@ class ScreenVision:
             }
     
     def _take_screenshot_internal(self, region: Optional[Dict[str, int]] = None) -> Dict[str, Any]:
-        """Prend une capture interne pour analyse"""
+        """Prend une capture interne pour analyse (optimisée pour API Vision)"""
         try:
             # Prendre la capture
             if region:
@@ -310,12 +326,39 @@ class ScreenVision:
             else:
                 screenshot = pyautogui.screenshot()
             
-            # Sauvegarder temporairement
+            # OPTIMISATION : Redimensionner pour l'API Vision
+            # L'API Vision fonctionne bien avec des images plus petites
+            max_width = 1920  # Largeur max recommandée
+            max_height = 1080  # Hauteur max recommandée
+            
+            # Calculer le ratio de redimensionnement si nécessaire
+            if screenshot.width > max_width or screenshot.height > max_height:
+                ratio = min(max_width / screenshot.width, max_height / screenshot.height)
+                new_width = int(screenshot.width * ratio)
+                new_height = int(screenshot.height * ratio)
+                
+                screenshot = screenshot.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                print(f"📐 Image redimensionnée: {new_width}x{new_height} (ratio: {ratio:.2f})")
+            
+            # Sauvegarder temporairement avec compression optimisée
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            temp_filename = f"jarvis_temp_{timestamp}.png"
+            temp_filename = f"jarvis_temp_{timestamp}.jpg"  # JPEG au lieu de PNG pour réduire la taille
             temp_path = self.temp_dir / temp_filename
             
-            screenshot.save(str(temp_path))
+            # CORRECTION : Convertir RGBA vers RGB pour JPEG
+            if screenshot.mode in ('RGBA', 'LA'):
+                # Créer un fond blanc pour remplacer la transparence
+                background = Image.new('RGB', screenshot.size, (255, 255, 255))
+                if screenshot.mode == 'RGBA':
+                    background.paste(screenshot, mask=screenshot.split()[-1])  # Utiliser le canal alpha comme masque
+                else:
+                    background.paste(screenshot, mask=screenshot.split()[-1])
+                screenshot = background
+            elif screenshot.mode != 'RGB':
+                screenshot = screenshot.convert('RGB')
+            
+            # Sauvegarder avec compression JPEG (qualité 85 = bon compromis)
+            screenshot.save(str(temp_path), "JPEG", quality=85, optimize=True)
             
             return {
                 "success": True,

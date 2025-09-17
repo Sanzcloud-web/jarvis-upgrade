@@ -74,7 +74,10 @@ class OpenAIClient:
                     
                     # Traitement spécial pour screenshot_and_analyze
                     if tool_name == "screenshot_and_analyze" and result.get("requires_vision_analysis"):
-                        # Analyser l'image avec l'API Vision
+                        # OPTIMISATION : Analyser l'image avec l'API Vision DIRECTEMENT
+                        # sans passer par tout l'historique pour économiser les tokens
+                        print("🔍 Analyse de l'image en cours (optimisée)...")
+                        
                         vision_result = self._analyze_image_with_vision(
                             result.get("screenshot_base64"),
                             result.get("analysis_prompt", "Que vois-tu dans cette image ?")
@@ -84,11 +87,15 @@ class OpenAIClient:
                             # Fusionner les résultats
                             result["vision_analysis"] = vision_result["analysis"]
                             result["vision_success"] = True
-                            result["message"] = f"📸 Capture d'écran analysée: {vision_result['analysis']}"
+                            result["model_used"] = vision_result.get("model_used", "gpt-4o-mini")
+                            result["tokens_used"] = vision_result.get("tokens_used", "N/A")
+                            result["message"] = f"📸 Analyse terminée avec {result['model_used']}: {vision_result['analysis']}"
+                            print(f"✅ Analyse réussie avec {result['model_used']} ({result['tokens_used']} tokens)")
                         else:
                             result["vision_success"] = False
                             result["vision_error"] = vision_result.get("error", "Erreur inconnue")
                             result["message"] = f"📸 Capture prise mais erreur d'analyse: {vision_result.get('error')}"
+                            print(f"❌ Erreur d'analyse: {vision_result.get('error')}")
 
                     # Ajouter l'appel d'outil à l'historique
                     self.conversation_history.append({
@@ -487,7 +494,7 @@ Réponds TOUJOURS en français avec des actions concrètes et mesurables.""")
     
     def _analyze_image_with_vision(self, base64_image: str, analysis_prompt: str) -> Dict[str, Any]:
         """
-        Analyse une image avec l'API Vision d'OpenAI
+        Analyse une image avec l'API Vision d'OpenAI (optimisé pour les limites)
         
         Args:
             base64_image: Image encodée en base64
@@ -500,40 +507,57 @@ Réponds TOUJOURS en français avec des actions concrètes et mesurables.""")
             if not base64_image:
                 return {"success": False, "error": "Aucune image fournie"}
             
-            # Préparer le message pour l'API Vision
+            # OPTIMISATION : Prompt court et direct pour réduire les tokens
+            short_prompt = f"Analyse brièvement cette capture d'écran: {analysis_prompt[:100]}"
+            
+            # Préparer le message pour l'API Vision (SIMPLE et COURT)
             vision_messages = [
                 {
                     "role": "user",
                     "content": [
                         {
                             "type": "text",
-                            "text": f"Analyse cette capture d'écran et réponds à cette demande: {analysis_prompt}"
+                            "text": short_prompt
                         },
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": f"data:image/png;base64,{base64_image}",
-                                "detail": "high"
+                                "url": f"data:image/jpeg;base64,{base64_image}",  # JPEG au lieu de PNG
+                                "detail": "low"  # BASSE résolution pour économiser les tokens
                             }
                         }
                     ]
                 }
             ]
             
-            # Appel à l'API Vision (utiliser gpt-4-vision-preview ou gpt-4o)
-            vision_response = self.client.chat.completions.create(
-                model="gpt-4o",  # Modèle avec capacités vision
-                messages=vision_messages,
-                max_tokens=1000,
-                temperature=0.3
-            )
+            # OPTIMISATION : Utiliser gpt-4o-mini qui est plus efficace pour la vision
+            try:
+                vision_response = self.client.chat.completions.create(
+                    model="gpt-4o-mini",  # Modèle plus efficient
+                    messages=vision_messages,
+                    max_tokens=500,  # RÉDUIRE les tokens de sortie
+                    temperature=0.2
+                )
+                model_used = "gpt-4o-mini"
+            except Exception as e:
+                # Fallback vers le modèle standard si mini n'est pas disponible
+                if "model_not_found" in str(e) or "does not exist" in str(e):
+                    vision_response = self.client.chat.completions.create(
+                        model="gpt-4o",
+                        messages=vision_messages,
+                        max_tokens=500,
+                        temperature=0.2
+                    )
+                    model_used = "gpt-4o"
+                else:
+                    raise e
             
             analysis_text = vision_response.choices[0].message.content
             
             return {
                 "success": True,
                 "analysis": analysis_text,
-                "model_used": "gpt-4o",
+                "model_used": model_used,
                 "tokens_used": vision_response.usage.total_tokens if hasattr(vision_response, 'usage') else None
             }
             
@@ -541,7 +565,12 @@ Réponds TOUJOURS en français avec des actions concrètes et mesurables.""")
             error_msg = str(e)
             
             # Messages d'erreur plus spécifiques
-            if "insufficient_quota" in error_msg:
+            if "rate_limit_exceeded" in error_msg or "429" in error_msg:
+                if "tokens per min" in error_msg:
+                    error_msg = "Limite de tokens/minute dépassée. L'image était trop grande. Réessayez dans quelques secondes."
+                else:
+                    error_msg = "Limite de requêtes dépassée. Attendez quelques secondes avant de réessayer."
+            elif "insufficient_quota" in error_msg:
                 error_msg = "Quota insuffisant pour l'API Vision. Vérifiez votre plan OpenAI."
             elif "model_not_found" in error_msg:
                 error_msg = "Modèle Vision non disponible. Votre plan OpenAI supporte-t-il gpt-4o ?"
