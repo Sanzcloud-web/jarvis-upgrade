@@ -1,94 +1,40 @@
 # -*- coding: utf-8 -*-
 """
-Gestionnaire centralisé de tous les outils JARVIS
+Gestionnaire centralisé de tous les outils JARVIS avec auto-découverte
 """
 
 from typing import Dict, Any, List, Optional
-from .file_system.file_operations import FileOperations
-from .file_system.directory_operations import DirectoryOperations
-from .text_editor.text_editor import TextEditor
-from .system.system_commands import SystemCommands
-from .utilities.datetime_tools import DateTimeTools
-from .utilities.calculator import Calculator
+from .auto_loader import auto_loader, get_auto_discovered_tools
 
 class ToolManager:
     def __init__(self, base_path: str = None):
-        """Initialise le gestionnaire d'outils"""
+        """Initialise le gestionnaire d'outils avec auto-découverte"""
         self.base_path = base_path
         
-        # Initialiser tous les outils
-        self.file_ops = FileOperations(base_path)
-        self.dir_ops = DirectoryOperations(base_path)
-        self.text_editor = TextEditor(base_path)
-        self.system_commands = SystemCommands()
-        self.datetime_tools = DateTimeTools()
-        self.calculator = Calculator()
+        # Auto-découverte des outils
+        print("🔍 Auto-découverte des outils JARVIS en cours...")
+        self.tools_map, self.all_schemas = get_auto_discovered_tools()
         
-        # Mapping des outils
-        self.tools_map = {
-            # Opérations sur les fichiers
-            "create_file": self.file_ops,
-            "read_file": self.file_ops,
-            "edit_file": self.file_ops,
-            "append_to_file": self.file_ops,
-            "copy_file": self.file_ops,
-            "move_file": self.file_ops,
-            "delete_file": self.file_ops,
-            "file_info": self.file_ops,
-            
-            # Opérations sur les dossiers
-            "list_files": self.dir_ops,
-            "create_directory": self.dir_ops,
-            "remove_directory": self.dir_ops,
-            "copy_directory": self.dir_ops,
-            "search_files": self.dir_ops,
-            "get_directory_size": self.dir_ops,
-            
-            # Éditeur de texte avancé
-            "find_and_replace": self.text_editor,
-            "insert_line": self.text_editor,
-            "delete_lines": self.text_editor,
-            "replace_line": self.text_editor,
-            "show_lines": self.text_editor,
-            "search_in_file": self.text_editor,
-            
-            # Commandes système
-            "execute_command": self.system_commands,
-            "execute_command_confirmed": self.system_commands,
-            "get_system_info": self.system_commands,
-            "get_disk_usage": self.system_commands,
-            "get_memory_info": self.system_commands,
-            "get_cpu_info": self.system_commands,
-            "list_processes": self.system_commands,
-            "open_application": self.system_commands,
-            "open_url": self.system_commands,
-            "find_files_terminal": self.system_commands,
-            "smart_terminal_command": self.system_commands,
-            
-            # Outils de date/heure
-            "get_current_time": self.datetime_tools,
-            "add_time": self.datetime_tools,
-            "calculate_age": self.datetime_tools,
-            "get_calendar": self.datetime_tools,
-            
-            # Calculatrice
-            "calculate": self.calculator,
-            "convert_units": self.calculator,
-            "percentage_calculation": self.calculator
-        }
+        # Statistiques
+        tools_count = len(self.tools_map)
+        categories = auto_loader.get_tools_by_category()
+        categories_count = len(categories)
+        
+        print(f"✅ {tools_count} outils découverts dans {categories_count} catégories")
+        
+        # Afficher le résumé par catégorie
+        for category, tools in categories.items():
+            category_emoji = {
+                "file_system": "📁",
+                "text_editor": "📝", 
+                "system": "⚙️",
+                "utilities": "🔧"
+            }.get(category, "🔧")
+            print(f"   {category_emoji} {category}: {len(tools)} outils")
 
     def get_all_tools_schema(self) -> List[Dict[str, Any]]:
-        """Retourne tous les schémas d'outils disponibles"""
-        all_schemas = []
-        
-        all_schemas.extend(self.file_ops.get_tools_schema())
-        all_schemas.extend(self.dir_ops.get_tools_schema())
-        all_schemas.extend(self.text_editor.get_tools_schema())
-        all_schemas.extend(self.system_commands.get_tools_schema())
-        all_schemas.extend(self.datetime_tools.get_tools_schema())
-        all_schemas.extend(self.calculator.get_tools_schema())
-        
-        return all_schemas
+        """Retourne tous les schémas d'outils disponibles (auto-découverts)"""
+        return self.all_schemas
 
     def execute_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Exécute un outil spécifique"""
@@ -118,71 +64,15 @@ class ToolManager:
 
     def _get_tool_category(self, tool_name: str) -> str:
         """Détermine la catégorie d'un outil"""
-        categories = {
-            # Fichiers
-            "create_file": "file_operations",
-            "read_file": "file_operations", 
-            "edit_file": "file_operations",
-            "append_to_file": "file_operations",
-            "copy_file": "file_operations",
-            "move_file": "file_operations", 
-            "delete_file": "file_operations",
-            "file_info": "file_operations",
-            
-            # Dossiers
-            "list_files": "directory_operations",
-            "create_directory": "directory_operations",
-            "remove_directory": "directory_operations", 
-            "copy_directory": "directory_operations",
-            "search_files": "directory_operations",
-            "get_directory_size": "directory_operations",
-            
-            # Éditeur de texte
-            "find_and_replace": "text_editor",
-            "insert_line": "text_editor",
-            "delete_lines": "text_editor",
-            "replace_line": "text_editor",
-            "show_lines": "text_editor",
-            "search_in_file": "text_editor",
-            
-            # Système
-            "execute_command": "system_commands",
-            "execute_command_confirmed": "system_commands",
-            "get_system_info": "system_commands",
-            "get_disk_usage": "system_commands",
-            "get_memory_info": "system_commands", 
-            "get_cpu_info": "system_commands",
-            "list_processes": "system_commands",
-            "open_application": "system_commands",
-            "open_url": "system_commands",
-            "find_files_terminal": "system_commands",
-            "smart_terminal_command": "system_commands",
-            
-            # Date/heure
-            "get_current_time": "datetime_tools",
-            "add_time": "datetime_tools",
-            "calculate_age": "datetime_tools", 
-            "get_calendar": "datetime_tools",
-            
-            # Calcul
-            "calculate": "calculator",
-            "convert_units": "calculator",
-            "percentage_calculation": "calculator"
-        }
-        
-        return categories.get(tool_name, "unknown")
+        # Utiliser l'auto-découverte pour obtenir la catégorie
+        tool_info = auto_loader.discovered_tools.get(tool_name)
+        if tool_info:
+            return tool_info["category"]
+        return "unknown"
 
     def get_tools_by_category(self) -> Dict[str, List[str]]:
-        """Retourne les outils groupés par catégorie"""
-        categories = {}
-        
-        for tool_name in self.tools_map.keys():
-            category = self._get_tool_category(tool_name)
-            if category not in categories:
-                categories[category] = []
-            categories[category].append(tool_name)
-        
-        return categories
+        """Retourne les outils groupés par catégorie (auto-découverts)"""
+        return auto_loader.get_tools_by_category()
 
     def get_tool_help(self, tool_name: str = None) -> Dict[str, Any]:
         """Retourne l'aide pour un outil spécifique ou tous les outils"""
